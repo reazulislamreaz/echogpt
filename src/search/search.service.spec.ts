@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { UsageService } from '../usage/usage.service';
 import { SearchService } from './search.service';
+import { SearchCacheService } from './services/search-cache.service';
 import { WebSearchProviderService } from './services/web-search-provider.service';
 import { WebSearchProviderError } from './interfaces/web-search.interface';
 
@@ -14,6 +15,7 @@ describe('SearchService', () => {
   let subscriptionsService: any;
   let usageService: any;
   let webSearchProvider: any;
+  let searchCache: { get: jest.Mock; set: jest.Mock };
 
   const searchRow = {
     id: 'search-1',
@@ -48,7 +50,7 @@ describe('SearchService', () => {
     };
 
     usageService = {
-      recordUsage: jest.fn().mockResolvedValue({}),
+      safeRecordUsage: jest.fn().mockResolvedValue({}),
     };
 
     webSearchProvider = {
@@ -58,6 +60,11 @@ describe('SearchService', () => {
       }),
     };
 
+    searchCache = {
+      get: jest.fn().mockResolvedValue(null),
+      set: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         SearchService,
@@ -65,6 +72,7 @@ describe('SearchService', () => {
         { provide: SubscriptionsService, useValue: subscriptionsService },
         { provide: UsageService, useValue: usageService },
         { provide: WebSearchProviderService, useValue: webSearchProvider },
+        { provide: SearchCacheService, useValue: searchCache },
         {
           provide: ConfigService,
           useValue: {
@@ -89,6 +97,7 @@ describe('SearchService', () => {
 
     expect(subscriptionsService.checkRequestAllowance).toHaveBeenCalledWith('user-1');
     expect(webSearchProvider.search).toHaveBeenCalled();
+    expect(searchCache.set).toHaveBeenCalled();
     expect(prisma.webSearch.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -99,7 +108,7 @@ describe('SearchService', () => {
         }),
       }),
     );
-    expect(usageService.recordUsage).toHaveBeenCalledWith(
+    expect(usageService.safeRecordUsage).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: 'user-1',
         endpoint: '/api/v1/web-search',
@@ -109,6 +118,33 @@ describe('SearchService', () => {
     );
     expect(result.query).toBe('NestJS modules');
     expect(JSON.stringify(result)).not.toContain('sk-');
+  });
+
+  it('uses cached provider results and still persists per-user history', async () => {
+    searchCache.get.mockResolvedValue({
+      provider: 'serper',
+      results: searchRow.results,
+    });
+    prisma.webSearch.create.mockResolvedValue({ ...searchRow, provider: 'serper' });
+
+    const result = await service.search('user-1', { query: 'NestJS modules' });
+
+    expect(webSearchProvider.search).not.toHaveBeenCalled();
+    expect(searchCache.set).not.toHaveBeenCalled();
+    expect(prisma.webSearch.create).toHaveBeenCalled();
+    expect(result.provider).toBe('serper');
+  });
+
+  it('continues when cache set fails after provider success', async () => {
+    searchCache.set.mockRejectedValue(new Error('redis down'));
+    prisma.webSearch.create.mockResolvedValue(searchRow);
+
+    const result = await service.search('user-1', { query: 'NestJS modules' });
+
+    expect(result.query).toBe('NestJS modules');
+    expect(usageService.safeRecordUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ statusCode: 200 }),
+    );
   });
 
   it('rejects when subscription limit is exceeded', async () => {
@@ -124,7 +160,7 @@ describe('SearchService', () => {
     );
 
     await expect(service.search('user-1', { query: 'NestJS' })).rejects.toThrow(HttpException);
-    expect(usageService.recordUsage).toHaveBeenCalledWith(
+    expect(usageService.safeRecordUsage).toHaveBeenCalledWith(
       expect.objectContaining({
         statusCode: 502,
         errorMessage: 'Web search provider request failed',

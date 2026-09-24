@@ -68,7 +68,7 @@ describe('ChatService', () => {
     };
 
     usageService = {
-      recordUsage: jest.fn().mockResolvedValue({}),
+      safeRecordUsage: jest.fn().mockResolvedValue({}),
     };
 
     aiCompletionService = {
@@ -79,6 +79,7 @@ describe('ChatService', () => {
         completionTokens: 7,
         totalTokens: 12,
       }),
+      completeStream: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -167,7 +168,7 @@ describe('ChatService', () => {
       expect(aiCompletionService.complete).toHaveBeenCalled();
       expect(result.userMessage.content).toBe('Hi');
       expect(result.assistantMessage.content).toBe('Hello from AI');
-      expect(usageService.recordUsage).toHaveBeenCalledWith(
+      expect(usageService.safeRecordUsage).toHaveBeenCalledWith(
         expect.objectContaining({
           userId: 'user-1',
           provider: 'OPENAI',
@@ -185,6 +186,90 @@ describe('ChatService', () => {
         HttpException,
       );
       expect(aiCompletionService.complete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('streamMessage', () => {
+    it('emits chunks then done and records successful usage', async () => {
+      prisma.conversation.findUnique.mockResolvedValue(conversation);
+      prisma.message.findMany.mockResolvedValue([]);
+      prisma.message.create
+        .mockResolvedValueOnce({
+          id: 'msg-user',
+          conversationId: 'conv-1',
+          role: MessageRole.USER,
+          content: 'Hi',
+          provider: 'OPENAI',
+          model: 'gpt-4o-mini',
+          promptTokens: null,
+          completionTokens: null,
+          totalTokens: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          metadata: null,
+        })
+        .mockResolvedValueOnce({
+          id: 'msg-assistant',
+          conversationId: 'conv-1',
+          role: MessageRole.ASSISTANT,
+          content: 'Hello streamed',
+          provider: 'OPENAI',
+          model: 'gpt-4o-mini',
+          promptTokens: 5,
+          completionTokens: 7,
+          totalTokens: 12,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          metadata: null,
+        });
+      prisma.conversation.update.mockResolvedValue(conversation);
+
+      aiCompletionService.completeStream.mockImplementation(async function* () {
+        yield { type: 'delta', text: 'Hello ' };
+        yield { type: 'delta', text: 'streamed' };
+        yield {
+          type: 'done',
+          result: {
+            content: 'Hello streamed',
+            model: 'gpt-4o-mini',
+            promptTokens: 5,
+            completionTokens: 7,
+            totalTokens: 12,
+          },
+        };
+      });
+
+      const events: Array<{ event: string; data: Record<string, unknown> }> = [];
+      for await (const event of service.streamMessage('user-1', 'conv-1', { content: 'Hi' })) {
+        events.push(event);
+      }
+
+      expect(events.some((e) => e.event === 'chunk')).toBe(true);
+      expect(events.at(-1)?.event).toBe('done');
+      expect(usageService.safeRecordUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 200 }),
+      );
+    });
+
+    it('does not consume successful quota when the stream fails', async () => {
+      prisma.conversation.findUnique.mockResolvedValue(conversation);
+      prisma.message.findMany.mockResolvedValue([]);
+      const { AiProviderRequestError } = await import('./interfaces/ai-completion.interface');
+      aiCompletionService.completeStream.mockImplementation(async function* () {
+        throw new AiProviderRequestError('AI provider request failed', 502);
+        yield { type: 'delta', text: '' };
+      });
+
+      const events: Array<{ event: string }> = [];
+      for await (const event of service.streamMessage('user-1', 'conv-1', { content: 'Hi' })) {
+        events.push(event);
+      }
+
+      expect(events.at(-1)?.event).toBe('error');
+      expect(usageService.safeRecordUsage).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: 502 }),
+      );
+      expect(prisma.message.create).not.toHaveBeenCalled();
     });
   });
 });

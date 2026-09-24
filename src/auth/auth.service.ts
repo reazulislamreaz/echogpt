@@ -190,6 +190,16 @@ export class AuthService {
       throw new UnauthorizedException('User account is deactivated');
     }
 
+    const requireEmailVerification = this.configService.get<boolean>(
+      'app.auth.requireEmailVerification',
+      false,
+    );
+    if (requireEmailVerification && !user.isEmailVerified) {
+      throw new UnauthorizedException(
+        'Email verification is required before login. Please verify your email address.',
+      );
+    }
+
     // Constant-time password comparison
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!isPasswordValid) {

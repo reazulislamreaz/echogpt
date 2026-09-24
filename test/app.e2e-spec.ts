@@ -31,13 +31,22 @@ describe('HealthController (e2e)', () => {
       .expect(200)
       .expect(
         (res: {
-          body: { status: string; service: string; database: string; timestamp: string };
+          body: {
+            status: string;
+            service: string;
+            database: string;
+            redis?: string;
+            smtp?: string;
+            timestamp: string;
+          };
         }) => {
           expect(res.body).toMatchObject({
             status: 'ok',
             service: 'echogpt-backend',
             database: 'up',
           });
+          expect(['up', 'down', 'disabled']).toContain(res.body.redis);
+          expect(['configured', 'unconfigured']).toContain(res.body.smtp);
           expect(res.body.timestamp).toBeDefined();
         },
       );

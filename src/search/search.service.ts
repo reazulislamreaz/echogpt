@@ -12,6 +12,7 @@ import {
   WebSearchResponseDto,
 } from './dto/web-search-response.dto';
 import { NormalizedSearchResult, WebSearchProviderError } from './interfaces/web-search.interface';
+import { SearchCacheService } from './services/search-cache.service';
 import { WebSearchProviderService } from './services/web-search-provider.service';
 
 @Injectable()
@@ -24,6 +25,7 @@ export class SearchService {
     private readonly subscriptionsService: SubscriptionsService,
     private readonly usageService: UsageService,
     private readonly webSearchProvider: WebSearchProviderService,
+    private readonly searchCache: SearchCacheService,
     private readonly configService: ConfigService,
   ) {
     this.requestTimeoutMs = this.configService.get<number>('app.webSearch.requestTimeoutMs', 15000);
@@ -47,15 +49,29 @@ export class SearchService {
       this.configService.get<string>('app.webSearch.provider', 'serper') ?? 'serper';
     let statusCode = 200;
     let errorMessage: string | null = null;
-    let execution;
+    let execution: { provider: string; results: NormalizedSearchResult[] };
 
     try {
-      execution = await this.webSearchProvider.search({
-        query,
-        limit,
-        timeoutMs: this.requestTimeoutMs,
-      });
-      providerName = execution.provider;
+      const cached = await this.searchCache.get(providerName, query, limit);
+      if (cached) {
+        execution = cached;
+        providerName = cached.provider;
+      } else {
+        execution = await this.webSearchProvider.search({
+          query,
+          limit,
+          timeoutMs: this.requestTimeoutMs,
+        });
+        providerName = execution.provider;
+        try {
+          await this.searchCache.set(providerName, query, limit, {
+            provider: execution.provider,
+            results: execution.results,
+          });
+        } catch {
+          // Cache write must never fail the search response.
+        }
+      }
     } catch (error) {
       const responseTimeMs = Date.now() - started;
       if (error instanceof WebSearchProviderError) {
@@ -66,7 +82,7 @@ export class SearchService {
         errorMessage = 'Web search provider request failed';
       }
 
-      await this.usageService.recordUsage({
+      await this.usageService.safeRecordUsage({
         userId,
         requestId,
         endpoint,
@@ -98,7 +114,7 @@ export class SearchService {
       },
     });
 
-    await this.usageService.recordUsage({
+    await this.usageService.safeRecordUsage({
       userId,
       requestId,
       endpoint,

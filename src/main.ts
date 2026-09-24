@@ -35,4 +35,10 @@ async function bootstrap(): Promise<void> {
   logger.log(`Environment: ${nodeEnv}`);
 }
 
-void bootstrap();
+void bootstrap().catch((error: unknown) => {
+  const logger = new Logger('Bootstrap');
+  logger.error(
+    `Failed to start EchoGPT API: ${error instanceof Error ? error.message : 'unknown error'}`,
+  );
+  process.exit(1);
+});

@@ -18,10 +18,10 @@ Production-oriented NestJS REST API for the EchoGPT Chrome Extension.
 ```bash
 cp .env.example .env
 # Fill DATABASE_URL, JWT_ACCESS_SECRET, ENCRYPTION_KEY
-# Optional: SMTP_* for verification email; WEB_SEARCH_API_KEY for live search
+# Optional: SMTP_*, REDIS_HOST, WEB_SEARCH_API_KEY
 npm install
 npx prisma generate
-docker compose up -d postgres
+docker compose up -d postgres redis
 npx prisma migrate deploy
 npx prisma db seed
 npm run start:dev
@@ -66,14 +66,35 @@ Copy `.env.example` to `.env` and fill required values. Never commit `.env`.
 **Optional (defaults in `.env.example`)**
 
 - App: `NODE_ENV`, `PORT`, `API_PREFIX`, `API_VERSION`, `CORS_ORIGIN`, `SWAGGER_*`
-- Auth: `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`, `BCRYPT_SALT_ROUNDS`, `EMAIL_VERIFICATION_EXPIRES_HOURS`
+- Auth: `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`, `BCRYPT_SALT_ROUNDS`, `EMAIL_VERIFICATION_EXPIRES_HOURS`, `REQUIRE_EMAIL_VERIFICATION`
 - SMTP: `SMTP_*`, `EMAIL_VERIFICATION_URL` (all-or-nothing when enabling email)
-- AI / search: `AI_*`, `WEB_SEARCH_*`
+- Redis: `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB`, `REDIS_KEY_PREFIX`, timeouts
+- Rate limit: `THROTTLE_TTL_MS`, `THROTTLE_LIMIT`
+- AI / search: `AI_*`, `WEB_SEARCH_*`, `WEB_SEARCH_CACHE_TTL_SECONDS`
 
 **Test-only**
 
 - `EMAIL_MOCK` — e2e sets `true` via `test/setup-e2e.ts`
 - `AI_COMPLETION_MOCK` / `WEB_SEARCH_MOCK` — used by chat/search e2e when live providers are not available
+
+### Redis (optional)
+
+Redis is **optional**. If `REDIS_HOST` is empty or Redis is unavailable, the application continues without caching. Core auth, chat, search, subscriptions, and admin stay available.
+
+```bash
+docker compose up -d redis
+# .env
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+```
+
+### HTTP rate limiting
+
+Global throttling via `@nestjs/throttler` (`THROTTLE_TTL_MS` / `THROTTLE_LIMIT`). Uses Redis when available and falls back to in-memory storage if Redis is down (fail-open for infrastructure availability).
+
+### Email verification enforcement
+
+`REQUIRE_EMAIL_VERIFICATION=false` (default) keeps existing login behavior. When `true`, unverified users cannot obtain sessions at login.
 
 ## Project structure
 
@@ -132,10 +153,12 @@ Notes:
 
 ### Chat (`/api/v1/conversations`)
 - Conversation CRUD (soft-delete), message history, send prompt + AI response
-- Ownership enforced; usage logged; provider credentials stay server-side
+- Streaming: `POST /conversations/:id/messages/stream` (SSE `chunk` / `done` / `error`)
+- Ownership enforced; usage logged on successful completion only; provider credentials stay server-side
 
 ### Web Search (`/api/v1/web-search`)
 - Search, history, recent, suggestions, get/delete own records
+- Optional Redis cache for provider results (TTL); per-user history always stored in PostgreSQL
 - Mock mode via `WEB_SEARCH_MOCK=true`
 
 ### Admin (`/api/v1/admin`) — ADMIN role required
@@ -167,9 +190,8 @@ Public probes remain on `GET /api/v1/health`.
 
 ## Known limitations / bonus (not core)
 
-- Streaming AI responses: **not implemented** (optional bonus)
-- Search result caching / Redis: **not implemented** (optional bonus)
-- Email delivery requires SMTP env configuration (Nodemailer); without SMTP in development, registration still succeeds and verification can be resent once SMTP is set
+- Search result caching uses optional Redis (fail-open); without Redis, search still works
+- AI streaming is available via SSE (`POST .../messages/stream`)
 - No payment gateway integration (by design)
 
 ## Subscription & Usage Architecture

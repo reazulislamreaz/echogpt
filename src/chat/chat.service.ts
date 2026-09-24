@@ -248,7 +248,7 @@ export class ChatService {
         errorMessage = 'AI provider request failed';
       }
 
-      await this.usageService.recordUsage({
+      await this.usageService.safeRecordUsage({
         userId,
         requestId,
         endpoint: `/api/v1/conversations/${conversationId}/messages`,
@@ -309,7 +309,7 @@ export class ChatService {
       return { userMessage, assistantMessage };
     });
 
-    await this.usageService.recordUsage({
+    await this.usageService.safeRecordUsage({
       userId,
       requestId,
       endpoint: `/api/v1/conversations/${conversationId}/messages`,
@@ -328,6 +328,183 @@ export class ChatService {
     return {
       userMessage: this.toSafeMessage(userMessage),
       assistantMessage: this.toSafeMessage(assistantMessage),
+    };
+  }
+
+  async *streamMessage(
+    userId: string,
+    conversationId: string,
+    dto: SendMessageDto,
+    meta?: { ipAddress?: string; userAgent?: string; signal?: AbortSignal },
+  ): AsyncGenerator<{ event: string; data: Record<string, unknown> }> {
+    const conversation = await this.getOwnedConversation(userId, conversationId);
+    await this.subscriptionsService.checkRequestAllowance(userId);
+
+    const providerId = dto.providerId ?? conversation.providerId;
+    const credentials = await this.providersService.resolveChatCredentials(userId, providerId);
+    const model =
+      dto.model?.trim() ||
+      conversation.model?.trim() ||
+      DEFAULT_MODELS[credentials.provider.slug.toUpperCase()] ||
+      'gpt-4o-mini';
+
+    const history = await this.prisma.message.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'asc' },
+      take: 40,
+      select: { role: true, content: true },
+    });
+
+    const completionMessages = [
+      ...history
+        .filter((m) => m.role !== MessageRole.SYSTEM)
+        .map((m) => ({
+          role: m.role.toLowerCase() as 'user' | 'assistant' | 'system',
+          content: m.content,
+        })),
+      { role: 'user' as const, content: dto.content },
+    ];
+
+    const requestId = randomUUID();
+    const started = Date.now();
+    const endpoint = `/api/v1/conversations/${conversationId}/messages/stream`;
+    let completion: Awaited<ReturnType<AiCompletionService['complete']>> | null = null;
+
+    try {
+      for await (const chunk of this.aiCompletionService.completeStream(
+        {
+          slug: credentials.provider.slug,
+          baseUrl: credentials.baseUrl,
+          apiKey: credentials.apiKey,
+          model,
+          messages: completionMessages,
+          timeoutMs: this.requestTimeoutMs,
+        },
+        meta?.signal,
+      )) {
+        if (chunk.type === 'delta') {
+          yield { event: 'chunk', data: { text: chunk.text } };
+        } else {
+          completion = chunk.result;
+        }
+      }
+    } catch (error) {
+      const responseTimeMs = Date.now() - started;
+      const aborted = error instanceof AiProviderRequestError && error.statusCode === 499;
+      const statusCode = error instanceof AiProviderRequestError ? error.statusCode : 502;
+      const errorMessage =
+        error instanceof AiProviderRequestError ? error.message : 'AI provider request failed';
+
+      if (!aborted) {
+        await this.usageService.safeRecordUsage({
+          userId,
+          requestId,
+          endpoint,
+          method: HttpMethod.POST,
+          provider: credentials.provider.slug,
+          model,
+          statusCode: statusCode === 499 ? 499 : statusCode,
+          responseTimeMs,
+          ipAddress: meta?.ipAddress,
+          userAgent: meta?.userAgent,
+          errorMessage,
+        });
+      }
+
+      yield {
+        event: 'error',
+        data: {
+          message: aborted ? 'Stream aborted' : errorMessage,
+          statusCode: aborted ? 499 : statusCode,
+        },
+      };
+      return;
+    }
+
+    if (!completion) {
+      await this.usageService.safeRecordUsage({
+        userId,
+        requestId,
+        endpoint,
+        method: HttpMethod.POST,
+        provider: credentials.provider.slug,
+        model,
+        statusCode: 502,
+        responseTimeMs: Date.now() - started,
+        ipAddress: meta?.ipAddress,
+        userAgent: meta?.userAgent,
+        errorMessage: 'AI stream completed without a final response',
+      });
+      yield {
+        event: 'error',
+        data: { message: 'AI stream completed without a final response', statusCode: 502 },
+      };
+      return;
+    }
+
+    const finalCompletion = completion;
+    const responseTimeMs = Date.now() - started;
+    const shouldAutoTitle = conversation.title === 'New Conversation' && history.length === 0;
+
+    const { userMessage, assistantMessage } = await this.prisma.$transaction(async (tx) => {
+      const userMessage = await tx.message.create({
+        data: {
+          conversationId,
+          role: MessageRole.USER,
+          content: dto.content,
+          provider: credentials.provider.slug,
+          model,
+        },
+      });
+
+      const assistantMessage = await tx.message.create({
+        data: {
+          conversationId,
+          role: MessageRole.ASSISTANT,
+          content: finalCompletion.content,
+          provider: credentials.provider.slug,
+          model: finalCompletion.model,
+          promptTokens: finalCompletion.promptTokens,
+          completionTokens: finalCompletion.completionTokens,
+          totalTokens: finalCompletion.totalTokens,
+        },
+      });
+
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: {
+          providerId: credentials.provider.id,
+          model: finalCompletion.model,
+          ...(shouldAutoTitle ? { title: this.buildTitleFromPrompt(dto.content) } : {}),
+          updatedAt: new Date(),
+        },
+      });
+
+      return { userMessage, assistantMessage };
+    });
+
+    await this.usageService.safeRecordUsage({
+      userId,
+      requestId,
+      endpoint,
+      method: HttpMethod.POST,
+      provider: credentials.provider.slug,
+      model: finalCompletion.model,
+      promptTokens: finalCompletion.promptTokens ?? undefined,
+      completionTokens: finalCompletion.completionTokens ?? undefined,
+      totalTokens: finalCompletion.totalTokens ?? undefined,
+      statusCode: 200,
+      responseTimeMs,
+      ipAddress: meta?.ipAddress,
+      userAgent: meta?.userAgent,
+    });
+
+    yield {
+      event: 'done',
+      data: {
+        userMessage: this.toSafeMessage(userMessage),
+        assistantMessage: this.toSafeMessage(assistantMessage),
+      },
     };
   }
 

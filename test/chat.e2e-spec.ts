@@ -168,6 +168,31 @@ describe('Chat & Conversations (e2e)', () => {
     expect(usageCount).toBeGreaterThanOrEqual(1);
   });
 
+  it('streams a chat response over SSE and persists the final assistant message', async () => {
+    const res = await request(app.getHttpServer())
+      .post(`/api/v1/conversations/${conversationId}/messages/stream`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .set('Accept', 'text/event-stream')
+      .send({ content: 'Stream hello' })
+      .expect(200);
+
+    expect(res.headers['content-type']).toContain('text/event-stream');
+    expect(res.text).toContain('event: chunk');
+    expect(res.text).toContain('event: done');
+    expect(res.text).toContain('Mock streamed response');
+    expect(res.text).not.toContain('sk-mock-provider-key-for-chat');
+
+    const usageCount = await prisma.aPIUsageLog.count({
+      where: {
+        userId: ownerId,
+        endpoint: `/api/v1/conversations/${conversationId}/messages/stream`,
+        method: HttpMethod.POST,
+        statusCode: 200,
+      },
+    });
+    expect(usageCount).toBeGreaterThanOrEqual(1);
+  });
+
   it('rejects chat when usage limit is exceeded with 429', async () => {
     const activeSub = await prisma.subscription.findFirst({
       where: { userId: ownerId, status: 'ACTIVE' },
