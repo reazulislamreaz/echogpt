@@ -95,6 +95,33 @@ class EnvironmentVariables {
   @Min(1000)
   @IsOptional()
   AI_REQUEST_TIMEOUT_MS: number = 30000;
+
+  @IsBooleanString()
+  @IsOptional()
+  WEB_SEARCH_MOCK: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  WEB_SEARCH_PROVIDER: string = 'serper';
+
+  @IsString()
+  @IsOptional()
+  WEB_SEARCH_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  WEB_SEARCH_BASE_URL?: string;
+
+  @IsInt()
+  @Min(1000)
+  @IsOptional()
+  WEB_SEARCH_TIMEOUT_MS: number = 15000;
+
+  @IsInt()
+  @Min(1)
+  @Max(20)
+  @IsOptional()
+  WEB_SEARCH_DEFAULT_LIMIT: number = 10;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
