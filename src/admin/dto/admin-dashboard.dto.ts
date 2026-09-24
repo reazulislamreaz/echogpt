@@ -1,43 +1,126 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class AdminDashboardStatsDto {
-  @ApiProperty({ example: 120 })
-  totalUsers!: number;
+export class AdminDashboardUsersStatsDto {
+  @ApiProperty()
+  total!: number;
 
-  @ApiProperty({ example: 110 })
-  activeUsers!: number;
+  @ApiProperty()
+  active!: number;
 
-  @ApiProperty({ example: 95 })
-  activeSubscriptions!: number;
+  @ApiProperty()
+  inactive!: number;
 
-  @ApiProperty({ example: 3 })
-  totalProviders!: number;
+  @ApiProperty()
+  verified!: number;
 
-  @ApiProperty({ example: 2 })
-  activeProviders!: number;
+  @ApiProperty()
+  unverified!: number;
 
-  @ApiProperty({ example: 450 })
-  totalConversations!: number;
+  @ApiProperty({ description: 'Users registered in the last 7 days' })
+  recentlyRegistered!: number;
+}
 
-  @ApiProperty({ example: 3200 })
-  totalMessages!: number;
+export class AdminDashboardSubscriptionsStatsDto {
+  @ApiProperty()
+  total!: number;
 
-  @ApiProperty({ example: 210 })
-  totalWebSearches!: number;
+  @ApiProperty()
+  active!: number;
 
-  @ApiProperty({ example: 5100 })
-  totalApiRequests!: number;
+  @ApiProperty()
+  free!: number;
 
-  @ApiProperty({ example: 4800 })
-  successfulApiRequests!: number;
+  @ApiProperty()
+  premium!: number;
 
-  @ApiProperty({ example: 300 })
-  failedApiRequests!: number;
+  @ApiProperty()
+  canceled!: number;
 
-  @ApiProperty({ example: 125000 })
+  @ApiProperty()
+  expired!: number;
+
+  @ApiProperty()
+  pastDue!: number;
+
+  @ApiProperty()
+  trialing!: number;
+}
+
+export class AdminDashboardProvidersStatsDto {
+  @ApiProperty()
+  total!: number;
+
+  @ApiProperty()
+  active!: number;
+
+  @ApiProperty()
+  inactive!: number;
+
+  @ApiProperty({ nullable: true })
+  defaultProvider!: string | null;
+}
+
+export class AdminDashboardUsageStatsDto {
+  @ApiProperty()
+  totalRequests!: number;
+
+  @ApiProperty()
+  successfulRequests!: number;
+
+  @ApiProperty()
+  failedRequests!: number;
+
+  @ApiProperty()
   totalTokensUsed!: number;
 
-  @ApiProperty({ example: '2026-09-24T10:00:00.000Z' })
+  @ApiProperty({ description: 'API requests created in the last 30 days' })
+  last30DaysRequests!: number;
+}
+
+export class AdminDashboardChatStatsDto {
+  @ApiProperty()
+  totalConversations!: number;
+
+  @ApiProperty()
+  totalMessages!: number;
+}
+
+export class AdminDashboardSearchStatsDto {
+  @ApiProperty()
+  totalSearches!: number;
+}
+
+export class AdminDashboardSystemStatsDto {
+  @ApiProperty({ example: 'up' })
+  database!: 'up' | 'down';
+
+  @ApiProperty({ example: 12345.6, description: 'Process uptime in seconds' })
+  uptimeSeconds!: number;
+}
+
+export class AdminDashboardStatsDto {
+  @ApiProperty({ type: AdminDashboardUsersStatsDto })
+  users!: AdminDashboardUsersStatsDto;
+
+  @ApiProperty({ type: AdminDashboardSubscriptionsStatsDto })
+  subscriptions!: AdminDashboardSubscriptionsStatsDto;
+
+  @ApiProperty({ type: AdminDashboardProvidersStatsDto })
+  providers!: AdminDashboardProvidersStatsDto;
+
+  @ApiProperty({ type: AdminDashboardUsageStatsDto })
+  usage!: AdminDashboardUsageStatsDto;
+
+  @ApiProperty({ type: AdminDashboardChatStatsDto })
+  chat!: AdminDashboardChatStatsDto;
+
+  @ApiProperty({ type: AdminDashboardSearchStatsDto })
+  webSearch!: AdminDashboardSearchStatsDto;
+
+  @ApiProperty({ type: AdminDashboardSystemStatsDto })
+  system!: AdminDashboardSystemStatsDto;
+
+  @ApiProperty()
   generatedAt!: string;
 }
 
@@ -57,6 +140,14 @@ export class UsageByEndpointDto {
   endpoint!: string;
 
   @ApiProperty({ example: 340 })
+  requestCount!: number;
+}
+
+export class UsageByStatusDto {
+  @ApiProperty({ example: 200 })
+  statusCode!: number;
+
+  @ApiProperty({ example: 120 })
   requestCount!: number;
 }
 
@@ -84,11 +175,20 @@ export class AdminUsageAnalyticsDto {
   @ApiProperty({ example: 125000, nullable: true })
   totalTokens!: number | null;
 
+  @ApiProperty({ example: 80000, nullable: true })
+  promptTokens!: number | null;
+
+  @ApiProperty({ example: 45000, nullable: true })
+  completionTokens!: number | null;
+
   @ApiProperty({ type: [UsageByProviderDto] })
   byProvider!: UsageByProviderDto[];
 
   @ApiProperty({ type: [UsageByEndpointDto] })
   byEndpoint!: UsageByEndpointDto[];
+
+  @ApiProperty({ type: [UsageByStatusDto] })
+  byStatusCode!: UsageByStatusDto[];
 
   @ApiProperty({ type: [UsageByDayDto] })
   byDay!: UsageByDayDto[];
@@ -169,8 +269,18 @@ export class AdminSystemHealthDto {
   @ApiProperty({ example: 'echogpt-backend' })
   service!: string;
 
-  @ApiProperty({ example: 'up' })
-  database!: 'up' | 'down';
+  @ApiProperty({ example: '0.1.0' })
+  version!: string;
+
+  @ApiProperty({
+    example: { status: 'connected' },
+  })
+  database!: {
+    status: 'connected' | 'disconnected';
+  };
+
+  @ApiProperty({ example: 12345.6 })
+  uptimeSeconds!: number;
 
   @ApiProperty({
     example: {

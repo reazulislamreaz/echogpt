@@ -456,13 +456,27 @@ export class SubscriptionsService {
   }
 
   /**
-   * Lists subscriptions with pagination (Admin only).
+   * Lists subscriptions with pagination and optional filters (Admin only).
    */
-  async adminGetSubscriptions(page = 1, limit = 20) {
+  async adminGetSubscriptions(
+    page = 1,
+    limit = 20,
+    filters?: {
+      status?: SubscriptionStatus;
+      planId?: string;
+      userId?: string;
+    },
+  ) {
     const skip = (page - 1) * limit;
+    const where: Prisma.SubscriptionWhereInput = {
+      ...(filters?.status ? { status: filters.status } : {}),
+      ...(filters?.planId ? { planId: filters.planId } : {}),
+      ...(filters?.userId ? { userId: filters.userId } : {}),
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.subscription.findMany({
+        where,
         skip,
         take: limit,
         include: {
@@ -480,7 +494,7 @@ export class SubscriptionsService {
           createdAt: 'desc',
         },
       }),
-      this.prisma.subscription.count(),
+      this.prisma.subscription.count({ where }),
     ]);
 
     return {
@@ -492,8 +506,38 @@ export class SubscriptionsService {
         page,
         limit,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limit) || 1,
       },
+    };
+  }
+
+  /**
+   * Returns a single subscription with user summary (Admin only).
+   */
+  async adminGetSubscriptionById(id: string) {
+    const sub = await this.prisma.subscription.findUnique({
+      where: { id },
+      include: {
+        plan: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            isActive: true,
+          },
+        },
+      },
+    });
+
+    if (!sub) {
+      throw new NotFoundException(`Subscription with ID ${id} not found`);
+    }
+
+    return {
+      ...this.toSafeSubscription(sub),
+      user: sub.user,
     };
   }
 

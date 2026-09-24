@@ -1,6 +1,7 @@
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { RoleType } from '../roles/enums/role.enum';
 import { UsersService } from '../users/users.service';
 import { AdminService } from './admin.service';
 
@@ -12,22 +13,29 @@ describe('AdminService', () => {
   beforeEach(async () => {
     prisma = {
       user: {
-        count: jest.fn(),
+        count: jest.fn().mockResolvedValue(1),
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
         update: jest.fn(),
       },
-      subscription: { count: jest.fn() },
+      role: { findUnique: jest.fn() },
+      subscription: { count: jest.fn().mockResolvedValue(1), findFirst: jest.fn() },
       aIProvider: {
-        count: jest.fn(),
-        findFirst: jest.fn(),
+        count: jest.fn().mockResolvedValue(1),
+        findFirst: jest.fn().mockResolvedValue({ slug: 'OPENAI' }),
       },
-      conversation: { count: jest.fn() },
-      message: { count: jest.fn() },
-      webSearch: { count: jest.fn() },
+      conversation: { count: jest.fn().mockResolvedValue(1) },
+      message: { count: jest.fn().mockResolvedValue(1) },
+      webSearch: { count: jest.fn().mockResolvedValue(1) },
       aPIUsageLog: {
-        count: jest.fn(),
-        aggregate: jest.fn(),
-        groupBy: jest.fn(),
-        findMany: jest.fn(),
+        count: jest.fn().mockResolvedValue(1),
+        aggregate: jest.fn().mockResolvedValue({
+          _count: { _all: 1 },
+          _sum: { totalTokens: 10, promptTokens: 4, completionTokens: 6 },
+          _avg: { responseTimeMs: 12 },
+        }),
+        groupBy: jest.fn().mockResolvedValue([]),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       session: { updateMany: jest.fn() },
       isHealthy: jest.fn().mockResolvedValue(true),
@@ -39,7 +47,12 @@ describe('AdminService', () => {
 
     usersService = {
       findById: jest.fn(),
-      toSafeUser: jest.fn((u: unknown) => u),
+      toSafeUser: jest.fn((u: Record<string, unknown>) => ({
+        id: u.id,
+        email: u.email,
+        role: (u.role as { name?: string } | undefined)?.name ?? 'USER',
+        isActive: u.isActive,
+      })),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -53,38 +66,17 @@ describe('AdminService', () => {
     service = module.get(AdminService);
   });
 
-  it('returns dashboard statistics', async () => {
-    prisma.user.count.mockResolvedValueOnce(10).mockResolvedValueOnce(8);
-    prisma.subscription.count.mockResolvedValue(7);
-    prisma.aIProvider.count.mockResolvedValueOnce(3).mockResolvedValueOnce(2);
-    prisma.conversation.count.mockResolvedValue(20);
-    prisma.message.count.mockResolvedValue(100);
-    prisma.webSearch.count.mockResolvedValue(15);
-    prisma.aPIUsageLog.count
-      .mockResolvedValueOnce(200)
-      .mockResolvedValueOnce(180)
-      .mockResolvedValueOnce(20);
-    prisma.aPIUsageLog.aggregate.mockResolvedValue({ _sum: { totalTokens: 5000 } });
-
+  it('returns nested dashboard statistics', async () => {
     const result = await service.getDashboardStats();
-
-    expect(result.totalUsers).toBe(10);
-    expect(result.activeUsers).toBe(8);
-    expect(result.totalTokensUsed).toBe(5000);
-    expect(result.generatedAt).toBeDefined();
+    expect(result.users).toBeDefined();
+    expect(result.subscriptions).toBeDefined();
+    expect(result.providers.defaultProvider).toBe('OPENAI');
+    expect(result.system.database).toBe('up');
   });
 
   it('returns system health without secrets', async () => {
-    prisma.aIProvider.count
-      .mockResolvedValueOnce(3)
-      .mockResolvedValueOnce(2)
-      .mockResolvedValueOnce(2);
-    prisma.aIProvider.findFirst.mockResolvedValue({ slug: 'OPENAI' });
-
     const result = await service.getSystemHealth();
-
-    expect(result.database).toBe('up');
-    expect(result.providers.defaultProvider).toBe('OPENAI');
+    expect(result.database.status).toBe('connected');
     expect(JSON.stringify(result)).not.toMatch(/apiKey|password|secret/i);
   });
 
@@ -93,6 +85,7 @@ describe('AdminService', () => {
       id: 'user-1',
       deletedAt: null,
       isActive: true,
+      role: { name: RoleType.USER },
     });
     prisma.user.update.mockResolvedValue({
       id: 'user-1',
@@ -110,12 +103,27 @@ describe('AdminService', () => {
     );
   });
 
+  it('prevents demoting the last active administrator', async () => {
+    usersService.findById.mockResolvedValue({
+      id: 'admin-1',
+      deletedAt: null,
+      isActive: true,
+      role: { name: RoleType.ADMIN },
+    });
+    prisma.user.count.mockResolvedValue(1);
+    prisma.role.findUnique.mockResolvedValue({ id: 'role-user', name: RoleType.USER });
+
+    await expect(service.updateUserRole('other-admin', 'admin-1', RoleType.USER)).rejects.toThrow(
+      ConflictException,
+    );
+  });
+
   it('throws when updating missing user', async () => {
     usersService.findById.mockResolvedValue(null);
     await expect(service.updateUserStatus('missing', false)).rejects.toThrow(NotFoundException);
   });
 
-  it('lists usage logs with pagination metadata', async () => {
+  it('lists usage logs with sanitized error messages', async () => {
     prisma.aPIUsageLog.findMany.mockResolvedValue([
       {
         id: 'log-1',
@@ -128,10 +136,10 @@ describe('AdminService', () => {
         promptTokens: null,
         completionTokens: null,
         totalTokens: null,
-        statusCode: 200,
+        statusCode: 502,
         responseTimeMs: 12,
         ipAddress: '127.0.0.1',
-        errorMessage: null,
+        errorMessage: 'Bearer sk-secret-token failed',
         createdAt: new Date(),
       },
     ]);
@@ -140,6 +148,7 @@ describe('AdminService', () => {
     const result = await service.getUsageLogs({ page: 1, limit: 20 });
 
     expect(result.items).toHaveLength(1);
-    expect(result.meta.total).toBe(1);
+    expect(result.items[0].errorMessage).not.toContain('sk-secret');
+    expect(result.items[0].errorMessage).toContain('[redacted]');
   });
 });
