@@ -81,6 +81,8 @@ Copy `.env.example` to `.env` and fill required values. Never commit `.env`.
 
 Redis is **optional**. If `REDIS_HOST` is empty or Redis is unavailable, the application continues without caching. Core auth, chat, search, subscriptions, and admin stay available.
 
+`GET /api/v1/health` reports Redis/SMTP as informational fields. Only database downtime returns HTTP 503.
+
 ```bash
 docker compose up -d redis
 # .env

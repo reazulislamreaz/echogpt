@@ -313,8 +313,7 @@ export class AiCompletionService {
         }
 
         const usage = parsed.usage as
-          | { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
-          | undefined;
+          { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
         if (usage) {
           promptTokens = usage.prompt_tokens ?? promptTokens;
           completionTokens = usage.completion_tokens ?? completionTokens;
@@ -435,10 +434,7 @@ export class AiCompletionService {
     }
   }
 
-  private async *iterateSse(
-    response: Response,
-    signal?: AbortSignal,
-  ): AsyncGenerator<string> {
+  private async *iterateSse(response: Response, signal?: AbortSignal): AsyncGenerator<string> {
     if (!response.body) {
       throw new AiProviderRequestError('AI provider returned an empty stream body', 502);
     }
