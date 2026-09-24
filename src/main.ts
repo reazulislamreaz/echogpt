@@ -39,6 +39,8 @@ async function bootstrap(): Promise<void> {
       .addTag('health')
       .addTag('auth')
       .addTag('users')
+      .addTag('subscriptions')
+      .addTag('admin')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);

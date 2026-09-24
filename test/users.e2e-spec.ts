@@ -72,6 +72,7 @@ describe('User Management & Profile (e2e)', () => {
     for (const u of users) {
       await prisma.emailVerificationToken.deleteMany({ where: { userId: u.id } });
       await prisma.session.deleteMany({ where: { userId: u.id } });
+      await prisma.subscription.deleteMany({ where: { userId: u.id } });
       await prisma.user.delete({ where: { id: u.id } });
     }
 
