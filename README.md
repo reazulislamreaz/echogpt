@@ -6,8 +6,9 @@ Production-oriented NestJS REST API for the EchoGPT Chrome Extension.
 
 - NestJS + TypeScript (strict)
 - PostgreSQL + Prisma
-- JWT Authentication (prepared)
-- Swagger/OpenAPI
+- JWT authentication + refresh-token sessions
+- RBAC (USER / ADMIN)
+- Swagger / OpenAPI
 - Docker
 - Jest + ESLint + Prettier
 
@@ -15,15 +16,27 @@ Production-oriented NestJS REST API for the EchoGPT Chrome Extension.
 
 ```bash
 cp .env.example .env
+# Fill DATABASE_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, ENCRYPTION_KEY
 npm install
 npx prisma generate
 docker compose up -d postgres
+npx prisma migrate deploy
+npx prisma db seed
 npm run start:dev
 ```
 
 - API base: `http://localhost:3000/api/v1`
 - Health: `GET /api/v1/health`
 - Swagger: `http://localhost:3000/api/docs`
+
+### Seeded demo admin
+
+After seeding:
+
+- Email: `admin@echogpt.local`
+- Password: `AdminPassword123!`
+
+Change this password in any shared/non-local environment.
 
 ## Scripts
 
@@ -35,6 +48,20 @@ npm run start:dev
 | `npm test` | Unit tests |
 | `npm run test:e2e` | End-to-end tests |
 | `npm run prisma:generate` | Generate Prisma Client |
+| `npm run prisma:migrate:deploy` | Apply migrations |
+| `npm run prisma:seed` | Seed roles, plans, providers, demo admin |
+
+## Environment
+
+See `.env.example` for placeholders. Important variables:
+
+- `DATABASE_URL`
+- `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET`
+- `ENCRYPTION_KEY` (AES-256-GCM for AI provider keys)
+- `AI_COMPLETION_MOCK` / `AI_REQUEST_TIMEOUT_MS`
+- `WEB_SEARCH_MOCK` / `WEB_SEARCH_PROVIDER` / `WEB_SEARCH_API_KEY`
+
+Never commit a real `.env` file.
 
 ## Project structure
 
@@ -45,35 +72,72 @@ src/
   health/ prisma/ common/
 ```
 
-Domain modules are organized cleanly by domain.
+## API overview
 
-## Subscription & Usage Architecture (Step 7)
+### Auth (`/api/v1/auth`)
+- Register, login, refresh, logout, me
+- Email verification + resend (hashed tokens)
+
+### Users (`/api/v1/users`)
+- Self: profile get/update, change password, soft-delete account
+- Admin: list users, get user by id
+
+### Subscriptions (`/api/v1/subscriptions`)
+- Plans, current subscription/status, upgrade, downgrade
+- Usage counted dynamically from `APIUsageLog` (no duplicated counters)
+- `requestLimit = null` → unlimited; exceeded limit → HTTP 429
+
+### AI Providers
+- User: list active providers, configure personal keys, set default
+- Admin (`/api/v1/admin/ai-providers`): CRUD, enable/disable, default, health-check
+
+### Chat (`/api/v1/conversations`)
+- Conversation CRUD (soft-delete), message history, send prompt + AI response
+- Ownership enforced; usage logged; provider credentials stay server-side
+
+### Web Search (`/api/v1/web-search`)
+- Search, history, recent, suggestions, get/delete own records
+- Mock mode via `WEB_SEARCH_MOCK=true`
+
+### Admin (`/api/v1/admin`) — ADMIN role required
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/admin/dashboard` | Dashboard statistics |
+| GET | `/admin/usage/analytics` | Usage analytics |
+| GET | `/admin/usage/logs` | Paginated request logs |
+| GET | `/admin/health` | System + provider config health |
+| PATCH | `/admin/users/:id/status` | Activate / deactivate user |
+| * | `/admin/subscription-plans` | Plan CRUD (admin) |
+| * | `/admin/subscriptions` | List / update subscription status |
+| * | `/admin/ai-providers` | Provider management |
+
+Public probes remain on `GET /api/v1/health`.
+
+## Architecture notes
+
+- Controllers → Services → Prisma → PostgreSQL
+- JWT access tokens + hashed refresh tokens in `Session`
+- AI provider API keys encrypted with `ENCRYPTION_KEY`
+- Usage metering: `APIUsageLog` aggregation over billing period
+- Ownership checks on conversations, messages, and search history
+
+## Known limitations / bonus (not core)
+
+- Streaming AI responses: **not implemented** (optional bonus)
+- Search result caching / Redis: **not implemented** (optional bonus)
+- Email delivery is a development logger stub (tokens are hashed and verified correctly)
+- No payment gateway integration (by design)
+
+## Subscription & Usage Architecture
 
 ### Subscription Lifecycle
-- **Plans**: Stored dynamically in PostgreSQL (`SubscriptionPlan`). Supported default tiers include `FREE` (free, 50 requests/month by default) and `PREMIUM` (paid, 1000 requests/month by default), plus custom plans.
-- **Auto-Provisioning**: Upon user registration, a `FREE` tier subscription is automatically created in an active state within a database transaction.
+- **Plans**: Stored in PostgreSQL (`SubscriptionPlan`). Default tiers: `FREE` and `PREMIUM`.
+- **Auto-Provisioning**: Registration creates an active `FREE` subscription in a transaction.
 - **Status Lifecycle**: `ACTIVE`, `TRIALING`, `PAST_DUE`, `CANCELED`, `EXPIRED`.
-  - When a user cancels, `canceledAt` is recorded, but access is retained until `currentPeriodEnd`.
-  - When `currentPeriodEnd` passes, the service automatically expires or advances periods depending on subscription policy.
 
 ### Usage Calculation & Billing Boundaries
-- **Dynamic Metering**: Requests are computed dynamically from `APIUsageLog` with a PostgreSQL database-level `COUNT` aggregate.
-- **No Duplicated State**: Neither `remainingRequests` nor `currentUsage` are stored as redundant columns.
-- **Calendar-Aware Billing Period**: Intervals use the half-open interval `[currentPeriodStart, currentPeriodEnd)`.
-- **System Isolation**: System logs with `userId = NULL` and background tasks are excluded from user quota calculations.
-
-### Request Allowance & Limit Enforcement
-- **Limit Enforcement**: `checkRequestAllowance(userId)` compares dynamic usage against `plan.requestLimit`.
-- **Unlimited Plans**: `requestLimit = null` is treated as unlimited.
-- **Quota Exceeded (HTTP 429)**: Once usage reaches or exceeds `requestLimit`, an `HttpException(HttpStatus.TOO_MANY_REQUESTS)` is raised with code `SUBSCRIPTION_LIMIT_EXCEEDED`.
-- **Reusable Guard**: `SubscriptionUsageGuard` is exported for use by downstream Chat, AI, and Web Search endpoints.
-
-### Upgrade & Downgrade Behavior
-- **Upgrade (`POST /subscriptions/upgrade`)**: Instantly transitions the user to the target plan within a database transaction, updates `currentPeriodStart` and `currentPeriodEnd` according to the new billing cycle, and preserves transition history.
-- **Downgrade (`POST /subscriptions/downgrade`)**: If downgrading to `FREE` or another lower tier, the change is scheduled or immediately processed cleanly without duplicate active records.
-- **Idempotency**: Attempting to upgrade to the already active plan is rejected with a 409 Conflict.
-
-### Concurrency & Performance
-- **Indexed Access**: API usage queries utilize composite index `(user_id, created_at)` for high throughput counting.
-- **Concurrency Trade-Off**: For Step 7, quota checks utilize PostgreSQL read-aggregation and transaction isolation. High-throughput distributed atomic reservation (e.g., Redis distributed token buckets or advisory locks) can be added in future scaling iterations if sub-millisecond edge collisions require strict zero-overshoot guarantees.
-
+- **Dynamic Metering**: Requests counted from `APIUsageLog` with a DB-level `COUNT`.
+- **No Duplicated State**: No stored `remainingRequests` / `currentUsage` columns.
+- **Billing Period**: Half-open interval `[currentPeriodStart, currentPeriodEnd)`.
+- **Quota Exceeded**: HTTP 429 with subscription limit semantics.
+- **Guard**: `SubscriptionUsageGuard` on chat send and web search.
