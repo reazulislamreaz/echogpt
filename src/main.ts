@@ -40,6 +40,7 @@ async function bootstrap(): Promise<void> {
       .addTag('auth')
       .addTag('users')
       .addTag('subscriptions')
+      .addTag('providers')
       .addTag('admin')
       .build();
 
