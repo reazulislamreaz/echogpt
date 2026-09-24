@@ -341,6 +341,94 @@ export class ProvidersService {
     return { message: 'User provider configuration deleted successfully' };
   }
 
+  /**
+   * Resolves an active provider and decrypted API key for chat completion.
+   * Priority: explicit providerId → user default config → system default.
+   * Key priority: user key for that provider → system key.
+   */
+  async resolveChatCredentials(
+    userId: string,
+    providerId?: string | null,
+  ): Promise<{
+    provider: AIProvider;
+    apiKey: string;
+    baseUrl: string | null;
+  }> {
+    let provider: AIProvider | null = null;
+    let userConfig: UserAIProvider | null = null;
+
+    if (providerId) {
+      provider = await this.prisma.aIProvider.findUnique({ where: { id: providerId } });
+      if (!provider) {
+        throw new NotFoundException('Requested AI provider was not found');
+      }
+      if (!provider.isActive) {
+        throw new BadRequestException('Requested AI provider is inactive');
+      }
+      userConfig = await this.prisma.userAIProvider.findUnique({
+        where: { userId_providerId: { userId, providerId } },
+      });
+    } else {
+      const userDefault = await this.prisma.userAIProvider.findFirst({
+        where: {
+          userId,
+          isDefault: true,
+          isEnabled: true,
+          provider: { isActive: true },
+        },
+        include: { provider: true },
+      });
+
+      if (userDefault) {
+        provider = userDefault.provider;
+        userConfig = userDefault;
+      } else {
+        provider = await this.prisma.aIProvider.findFirst({
+          where: { isDefault: true, isActive: true },
+        });
+        if (!provider) {
+          provider = await this.prisma.aIProvider.findFirst({
+            where: { isActive: true },
+            orderBy: { createdAt: 'asc' },
+          });
+        }
+        if (provider) {
+          userConfig = await this.prisma.userAIProvider.findUnique({
+            where: { userId_providerId: { userId, providerId: provider.id } },
+          });
+        }
+      }
+    }
+
+    if (!provider) {
+      throw new BadRequestException('No active AI provider is configured');
+    }
+
+    const encryptedKey =
+      userConfig?.isEnabled && userConfig.encryptedApiKey
+        ? userConfig.encryptedApiKey
+        : provider.encryptedApiKey;
+
+    if (!encryptedKey) {
+      throw new BadRequestException(
+        'No API key is configured for the selected provider. Configure a system or user API key first.',
+      );
+    }
+
+    let apiKey: string;
+    try {
+      apiKey = decryptSecret(encryptedKey, this.encryptionKey);
+    } catch {
+      throw new BadRequestException('Configured provider API key could not be decrypted');
+    }
+
+    return {
+      provider,
+      apiKey,
+      baseUrl: provider.baseUrl,
+    };
+  }
+
   // ==========================================
   // HELPERS
   // ==========================================

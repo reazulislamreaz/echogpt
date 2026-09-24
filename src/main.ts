@@ -41,6 +41,7 @@ async function bootstrap(): Promise<void> {
       .addTag('users')
       .addTag('subscriptions')
       .addTag('providers')
+      .addTag('chat')
       .addTag('admin')
       .build();
 

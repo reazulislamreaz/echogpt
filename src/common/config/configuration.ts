@@ -23,6 +23,10 @@ export default registerAs('app', () => ({
   encryption: {
     key: process.env.ENCRYPTION_KEY,
   },
+  ai: {
+    mockCompletions: (process.env.AI_COMPLETION_MOCK ?? 'false') === 'true',
+    requestTimeoutMs: parseInt(process.env.AI_REQUEST_TIMEOUT_MS ?? '30000', 10),
+  },
   database: {
     url: process.env.DATABASE_URL as string,
   },
