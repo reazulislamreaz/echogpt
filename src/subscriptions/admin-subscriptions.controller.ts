@@ -25,8 +25,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../roles/decorators/roles.decorator';
 import { RoleType } from '../roles/enums/role.enum';
 import { RolesGuard } from '../roles/guards/roles.guard';
-import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { AdminCreatePlanDto, AdminUpdatePlanDto } from './dto/admin-plan.dto';
+import { AdminSubscriptionQueryDto } from './dto/admin-subscription-query.dto';
 import { AdminUpdateSubscriptionStatusDto } from './dto/admin-subscription.dto';
 import { PlanResponseDto } from './dto/plan-response.dto';
 import { SubscriptionResponseDto } from './dto/subscription-response.dto';
@@ -97,15 +97,32 @@ export class AdminSubscriptionsController {
   @ApiOperation({
     summary: 'List all user subscriptions with pagination (Admin only)',
     description:
-      'Retrieves user subscriptions with pagination to manage and inspect user entitlements.',
+      'Retrieves user subscriptions with optional filters by status, planId, and userId.',
   })
   @ApiOkResponse({
     description: 'Paginated user subscriptions list',
   })
   @ApiUnauthorizedResponse({ description: 'Authentication required' })
   @ApiForbiddenResponse({ description: 'ADMIN role required' })
-  async getSubscriptions(@Query() query: PaginationQueryDto) {
-    return this.subscriptionsService.adminGetSubscriptions(query.page, query.limit);
+  async getSubscriptions(@Query() query: AdminSubscriptionQueryDto) {
+    return this.subscriptionsService.adminGetSubscriptions(query.page, query.limit, {
+      status: query.status,
+      planId: query.planId,
+      userId: query.userId,
+    });
+  }
+
+  @Get('subscriptions/:id')
+  @ApiOperation({
+    summary: 'Get subscription details (Admin only)',
+    description: 'Returns a subscription with plan and safe user summary.',
+  })
+  @ApiOkResponse({ description: 'Subscription details' })
+  @ApiNotFoundResponse({ description: 'Subscription not found' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  async getSubscription(@Param('id', ParseUUIDPipe) id: string) {
+    return this.subscriptionsService.adminGetSubscriptionById(id);
   }
 
   @Patch('subscriptions/:id/status')

@@ -102,13 +102,18 @@ src/
 ### Admin (`/api/v1/admin`) — ADMIN role required
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/admin/dashboard` | Dashboard statistics |
-| GET | `/admin/usage/analytics` | Usage analytics |
-| GET | `/admin/usage/logs` | Paginated request logs |
-| GET | `/admin/health` | System + provider config health |
+| GET | `/admin/dashboard` | Nested dashboard statistics |
+| GET | `/admin/users` | List/search/filter users |
+| GET | `/admin/users/:id` | User details |
 | PATCH | `/admin/users/:id/status` | Activate / deactivate user |
-| * | `/admin/subscription-plans` | Plan CRUD (admin) |
-| * | `/admin/subscriptions` | List / update subscription status |
+| PATCH | `/admin/users/:id/role` | Change USER/ADMIN role |
+| GET | `/admin/users/:id/subscription` | User active subscription |
+| GET | `/admin/users/:id/usage` | User usage summary |
+| GET | `/admin/usage` | Usage analytics |
+| GET | `/admin/logs` | Paginated request logs |
+| GET | `/admin/system/health` | System + provider health |
+| * | `/admin/subscription-plans` | Plan CRUD |
+| * | `/admin/subscriptions` | List/filter/get/update status |
 | * | `/admin/ai-providers` | Provider management |
 
 Public probes remain on `GET /api/v1/health`.

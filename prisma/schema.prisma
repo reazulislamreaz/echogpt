@@ -80,6 +80,8 @@ model User {
   apiUsageLogs            APIUsageLog[]
 
   @@index([roleId])
+  @@index([isActive])
+  @@index([createdAt])
   @@index([deletedAt])
   @@map("users")
 }
@@ -298,6 +300,7 @@ model APIUsageLog {
   @@index([userId, createdAt])
   @@index([createdAt])
   @@index([provider])
+  @@index([endpoint])
   @@index([requestId])
   @@index([statusCode])
   @@map("api_usage_logs")
