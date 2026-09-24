@@ -686,13 +686,11 @@ export class AdminService {
   ): Promise<Array<{ date: string; requestCount: number }>> {
     const createdAt =
       where.createdAt && typeof where.createdAt === 'object' ? where.createdAt : undefined;
-    const from =
-      createdAt && 'gte' in createdAt ? (createdAt.gte as Date | undefined) : undefined;
+    const from = createdAt && 'gte' in createdAt ? (createdAt.gte as Date | undefined) : undefined;
     const to = createdAt && 'lt' in createdAt ? (createdAt.lt as Date | undefined) : undefined;
 
     // Default to last 30 days when callers omit a window to avoid full-table scans.
-    const effectiveFrom =
-      from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const effectiveFrom = from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const effectiveTo = to ?? new Date();
 
     const rows = await this.prisma.$queryRaw<Array<{ day: Date; request_count: bigint }>>`

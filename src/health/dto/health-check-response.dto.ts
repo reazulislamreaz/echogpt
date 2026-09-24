@@ -21,7 +21,8 @@ export class HealthCheckResponseDto {
 
   @ApiPropertyOptional({
     example: 'configured',
-    description: 'Optional SMTP configuration status — unavailable SMTP does not degrade overall status',
+    description:
+      'Optional SMTP configuration status — unavailable SMTP does not degrade overall status',
   })
   smtp?: 'configured' | 'unconfigured';
 
