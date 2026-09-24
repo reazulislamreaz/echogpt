@@ -86,6 +86,15 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   ENCRYPTION_KEY!: string;
+
+  @IsBooleanString()
+  @IsOptional()
+  AI_COMPLETION_MOCK: string = 'false';
+
+  @IsInt()
+  @Min(1000)
+  @IsOptional()
+  AI_REQUEST_TIMEOUT_MS: number = 30000;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
