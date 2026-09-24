@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -89,6 +90,55 @@ async function main(): Promise<void> {
       },
     });
     console.log(`✓ Subscription Plan seeded: ${createdPlan.name} (${createdPlan.slug})`);
+  }
+
+  // Demo admin account for local/dev (placeholder password — change in production)
+  const adminRole = await prisma.role.findUnique({ where: { name: 'ADMIN' } });
+  if (adminRole) {
+    const adminEmail = 'admin@echogpt.local';
+    const adminPasswordHash = await bcrypt.hash('AdminPassword123!', 10);
+    const adminUser = await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: {
+        passwordHash: adminPasswordHash,
+        roleId: adminRole.id,
+        isActive: true,
+        isEmailVerified: true,
+        deletedAt: null,
+      },
+      create: {
+        email: adminEmail,
+        passwordHash: adminPasswordHash,
+        firstName: 'System',
+        lastName: 'Admin',
+        roleId: adminRole.id,
+        isActive: true,
+        isEmailVerified: true,
+      },
+    });
+    console.log(`✓ Admin user seeded: ${adminUser.email}`);
+
+    const freePlan = await prisma.subscriptionPlan.findUnique({ where: { name: 'FREE' } });
+    if (freePlan) {
+      const existingSub = await prisma.subscription.findFirst({
+        where: { userId: adminUser.id, status: 'ACTIVE' },
+      });
+      if (!existingSub) {
+        const now = new Date();
+        const periodEnd = new Date(now);
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+        await prisma.subscription.create({
+          data: {
+            userId: adminUser.id,
+            planId: freePlan.id,
+            status: 'ACTIVE',
+            currentPeriodStart: now,
+            currentPeriodEnd: periodEnd,
+          },
+        });
+        console.log('✓ Admin FREE subscription seeded');
+      }
+    }
   }
 
   // 3. AI Providers
