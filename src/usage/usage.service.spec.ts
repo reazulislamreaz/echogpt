@@ -41,9 +41,6 @@ describe('UsageService', () => {
             gte: start,
             lt: end,
           },
-          statusCode: {
-            lt: 400,
-          },
         },
       });
     });

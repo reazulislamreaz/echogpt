@@ -41,18 +41,40 @@ export class UsersService {
   }
 
   /**
-   * Finds all users with their assigned role and returns safe DTOs.
+   * Finds users with pagination and returns safe DTOs.
    */
-  async findAll(): Promise<UserResponseDto[]> {
-    const users = await this.prisma.user.findMany({
-      include: {
-        role: true,
+  async findAll(
+    page = 1,
+    limit = 20,
+  ): Promise<{
+    items: UserResponseDto[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
+  }> {
+    const skip = (page - 1) * limit;
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        skip,
+        take: limit,
+        include: {
+          role: true,
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+      this.prisma.user.count(),
+    ]);
+
+    return {
+      items: users.map((user) => this.toSafeUser(user)),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-    return users.map((user) => this.toSafeUser(user));
+    };
   }
 
   /**

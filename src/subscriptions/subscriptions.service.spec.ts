@@ -278,6 +278,45 @@ describe('SubscriptionsService', () => {
       await expect(service.upgrade('user-1', 'free')).rejects.toThrow(ConflictException);
     });
 
+    it('should reject upgrade to a lower or equal tier with BadRequestException', async () => {
+      const activePremiumSub = {
+        ...mockActiveSubscription,
+        planId: mockPremiumPlan.id,
+        plan: mockPremiumPlan,
+      };
+      prisma.subscription.findFirst.mockResolvedValue(activePremiumSub);
+      prisma.subscriptionPlan.findUnique.mockResolvedValue(mockFreePlan);
+
+      await expect(service.upgrade('user-1', 'free')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should clear scheduled downgrade when upgrading back to the same plan', async () => {
+      const premiumPendingDowngrade = {
+        ...mockActiveSubscription,
+        planId: mockPremiumPlan.id,
+        plan: mockPremiumPlan,
+        canceledAt: new Date(),
+        endDate: mockActiveSubscription.currentPeriodEnd,
+      };
+      prisma.subscription.findFirst.mockResolvedValue(premiumPendingDowngrade);
+      prisma.subscriptionPlan.findUnique.mockResolvedValue(mockPremiumPlan);
+      prisma.subscription.update.mockResolvedValue({
+        ...premiumPendingDowngrade,
+        canceledAt: null,
+        endDate: null,
+      });
+
+      const res = await service.upgrade('user-1', 'premium');
+      expect(res.canceledAt).toBeNull();
+      expect(prisma.subscription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: premiumPendingDowngrade.id },
+          data: { canceledAt: null, endDate: null },
+        }),
+      );
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
     it('should schedule end-of-period cancellation on downgrade', async () => {
       const activePremiumSub = {
         ...mockActiveSubscription,
@@ -312,6 +351,13 @@ describe('SubscriptionsService', () => {
       prisma.subscriptionPlan.findUnique.mockResolvedValue(mockFreePlan);
 
       await expect(service.downgrade('user-1', 'free')).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject downgrade to a higher tier with BadRequestException', async () => {
+      prisma.subscription.findFirst.mockResolvedValue(mockActiveSubscription);
+      prisma.subscriptionPlan.findUnique.mockResolvedValue(mockPremiumPlan);
+
+      await expect(service.downgrade('user-1', 'premium')).rejects.toThrow(BadRequestException);
     });
   });
 

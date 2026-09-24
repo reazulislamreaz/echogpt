@@ -233,12 +233,38 @@ export class SubscriptionsService {
 
     const currentSub = await this.getCurrentSubscription(userId);
 
+    // Same plan already active with no pending cancellation
     if (
       currentSub.plan.slug === slug &&
       currentSub.status === SubscriptionStatus.ACTIVE &&
       currentSub.canceledAt === null
     ) {
       throw new ConflictException('User is already actively subscribed to this plan');
+    }
+
+    // Same plan with a scheduled downgrade — cancel the pending downgrade (reactivate)
+    if (
+      currentSub.plan.slug === slug &&
+      currentSub.status === SubscriptionStatus.ACTIVE &&
+      currentSub.canceledAt !== null
+    ) {
+      const restored = await this.prisma.subscription.update({
+        where: { id: currentSub.id },
+        data: {
+          canceledAt: null,
+          endDate: null,
+        },
+        include: {
+          plan: true,
+        },
+      });
+      return this.toSafeSubscription(restored);
+    }
+
+    if (!this.isHigherPlan(targetPlan, currentSub.plan)) {
+      throw new BadRequestException(
+        'Target plan must be a higher tier than the current subscription. Use downgrade for lower tiers.',
+      );
     }
 
     const now = new Date();
@@ -295,6 +321,12 @@ export class SubscriptionsService {
       throw new BadRequestException('User is already on this subscription plan');
     }
 
+    if (!this.isHigherPlan(currentSub.plan, targetPlan)) {
+      throw new BadRequestException(
+        'Target plan must be a lower tier than the current subscription. Use upgrade for higher tiers.',
+      );
+    }
+
     if (currentSub.canceledAt !== null) {
       throw new ConflictException(
         'Subscription is already scheduled for downgrade at the end of the current billing cycle',
@@ -331,19 +363,32 @@ export class SubscriptionsService {
     const now = new Date();
     const currentPeriodEnd = calculateNextPeriodEnd(now, freePlan.billingCycle);
 
-    return this.prisma.subscription.create({
-      data: {
-        userId,
-        planId: freePlan.id,
-        status: SubscriptionStatus.ACTIVE,
-        startDate: now,
-        currentPeriodStart: now,
-        currentPeriodEnd,
-      },
-      include: {
-        plan: true,
-      },
-    });
+    try {
+      return await this.prisma.subscription.create({
+        data: {
+          userId,
+          planId: freePlan.id,
+          status: SubscriptionStatus.ACTIVE,
+          startDate: now,
+          currentPeriodStart: now,
+          currentPeriodEnd,
+        },
+        include: {
+          plan: true,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const existing = await this.prisma.subscription.findFirst({
+          where: { userId, status: SubscriptionStatus.ACTIVE },
+          include: { plan: true },
+        });
+        if (existing) {
+          return existing;
+        }
+      }
+      throw error;
+    }
   }
 
   // ==========================================
@@ -468,10 +513,27 @@ export class SubscriptionsService {
       throw new NotFoundException(`Subscription with ID ${id} not found`);
     }
 
-    const updated = await this.prisma.subscription.update({
-      where: { id },
-      data: { status },
-      include: { plan: true },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (status === SubscriptionStatus.ACTIVE && sub.status !== SubscriptionStatus.ACTIVE) {
+        await tx.subscription.updateMany({
+          where: {
+            userId: sub.userId,
+            status: SubscriptionStatus.ACTIVE,
+            id: { not: id },
+          },
+          data: {
+            status: SubscriptionStatus.CANCELED,
+            canceledAt: new Date(),
+            endDate: new Date(),
+          },
+        });
+      }
+
+      return tx.subscription.update({
+        where: { id },
+        data: { status },
+        include: { plan: true },
+      });
     });
 
     return this.toSafeSubscription(updated);
@@ -480,6 +542,22 @@ export class SubscriptionsService {
   // ==========================================
   // SERIALIZERS
   // ==========================================
+
+  /**
+   * Compares plan rank using price, then requestLimit (null = unlimited).
+   */
+  private isHigherPlan(candidate: SubscriptionPlan, baseline: SubscriptionPlan): boolean {
+    const candidateLimit = candidate.requestLimit ?? Number.MAX_SAFE_INTEGER;
+    const baselineLimit = baseline.requestLimit ?? Number.MAX_SAFE_INTEGER;
+    const candidatePrice = Number(candidate.price);
+    const baselinePrice = Number(baseline.price);
+
+    if (candidatePrice !== baselinePrice) {
+      return candidatePrice > baselinePrice;
+    }
+
+    return candidateLimit > baselineLimit;
+  }
 
   toSafePlan(plan: SubscriptionPlan): PlanResponseDto {
     return {

@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { HealthService } from './health.service';
 import { HealthCheckResponseDto } from './dto/health-check-response.dto';
 
@@ -10,6 +10,10 @@ export class HealthController {
 
   @Get()
   @ApiOperation({ summary: 'Application and database health check' })
+  @ApiOkResponse({
+    description: 'Service and database connectivity status',
+    type: HealthCheckResponseDto,
+  })
   check(): Promise<HealthCheckResponseDto> {
     return this.healthService.check();
   }

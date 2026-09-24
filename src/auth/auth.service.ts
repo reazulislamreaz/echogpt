@@ -8,10 +8,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { RoleType } from '../roles/enums/role.enum';
+import { calculateNextPeriodEnd } from '../subscriptions/utils/billing-period.util';
 import { UserResponseDto } from '../users/dto/user-response.dto';
-import { UsersService } from '../users/users.service';
+import { UserWithRole, UsersService } from '../users/users.service';
 import {
   AuthTokensDto,
   LoginResponseDto,
@@ -39,10 +41,11 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly emailService: EmailService,
   ) {
-    this.jwtAccessSecret =
-      this.configService.get<string>('app.jwt.accessSecret') ??
-      this.configService.get<string>('app.jwt.secret') ??
-      'change-me-access-secret';
+    const accessSecret = this.configService.get<string>('app.jwt.accessSecret');
+    if (!accessSecret) {
+      throw new InternalServerErrorException('JWT access secret is not configured');
+    }
+    this.jwtAccessSecret = accessSecret;
     this.jwtAccessExpiresIn = (this.configService.get<string>('app.jwt.accessExpiresIn') ??
       '15m') as `${number}${'s' | 'm' | 'h' | 'd'}`;
     this.jwtRefreshExpiresIn = this.configService.get<string>('app.jwt.refreshExpiresIn') ?? '7d';
@@ -84,41 +87,41 @@ export class AuthService {
       Date.now() + this.verificationExpiresHours * 60 * 60 * 1000,
     );
 
-    // Transactionally create User and EmailVerificationToken
-    const newUser = await this.prisma.$transaction(async (tx) => {
-      const createdUser = await tx.user.create({
-        data: {
-          email: normalizedEmail,
-          passwordHash,
-          firstName: dto.firstName?.trim() || null,
-          lastName: dto.lastName?.trim() || null,
-          isActive: true,
-          isEmailVerified: false,
-          roleId: userRole.id,
-        },
-        include: {
-          role: true,
-        },
-      });
+    let newUser: UserWithRole;
+    try {
+      newUser = await this.prisma.$transaction(async (tx) => {
+        const createdUser = await tx.user.create({
+          data: {
+            email: normalizedEmail,
+            passwordHash,
+            firstName: dto.firstName?.trim() || null,
+            lastName: dto.lastName?.trim() || null,
+            isActive: true,
+            isEmailVerified: false,
+            roleId: userRole.id,
+          },
+          include: {
+            role: true,
+          },
+        });
 
-      await tx.emailVerificationToken.create({
-        data: {
-          userId: createdUser.id,
-          tokenHash: verificationTokenHash,
-          expiresAt: verificationExpiresAt,
-        },
-      });
+        await tx.emailVerificationToken.create({
+          data: {
+            userId: createdUser.id,
+            tokenHash: verificationTokenHash,
+            expiresAt: verificationExpiresAt,
+          },
+        });
 
-      // Automatically provision default FREE subscription tier
-      const freePlan = await tx.subscriptionPlan.findUnique({
-        where: { slug: 'free' },
-      });
+        const freePlan = await tx.subscriptionPlan.findUnique({
+          where: { slug: 'free' },
+        });
 
-      if (freePlan) {
+        if (!freePlan) {
+          throw new InternalServerErrorException('Default FREE plan is not configured');
+        }
+
         const now = new Date();
-        const currentPeriodEnd = new Date(now.getTime());
-        currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
-
         await tx.subscription.create({
           data: {
             userId: createdUser.id,
@@ -126,13 +129,18 @@ export class AuthService {
             status: 'ACTIVE',
             startDate: now,
             currentPeriodStart: now,
-            currentPeriodEnd,
+            currentPeriodEnd: calculateNextPeriodEnd(now, freePlan.billingCycle),
           },
         });
-      }
 
-      return createdUser;
-    });
+        return createdUser;
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('An account with this email address already exists');
+      }
+      throw error;
+    }
 
     // Dispatch verification email (non-blocking simulation / queue)
     await this.emailService.sendVerificationEmail(normalizedEmail, rawVerificationToken);

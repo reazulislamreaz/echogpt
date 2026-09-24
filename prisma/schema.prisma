@@ -295,7 +295,7 @@ model APIUsageLog {
   errorMessage     String?    @map("error_message")
   createdAt        DateTime   @default(now()) @map("created_at")
 
-  @@index([userId])
+  @@index([userId, createdAt])
   @@index([createdAt])
   @@index([provider])
   @@index([requestId])

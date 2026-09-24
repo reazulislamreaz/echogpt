@@ -35,7 +35,10 @@ describe('UsersController', () => {
       updateProfile: jest.fn().mockResolvedValue(mockSafeProfile),
       changePassword: jest.fn().mockResolvedValue({ message: 'Password changed successfully.' }),
       softDeleteAccount: jest.fn().mockResolvedValue({ message: 'Account successfully deleted' }),
-      findAll: jest.fn().mockResolvedValue([mockSafeProfile]),
+      findAll: jest.fn().mockResolvedValue({
+        items: [mockSafeProfile],
+        meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+      }),
       findById: jest.fn().mockResolvedValue(mockSafeProfile),
       toSafeUser: jest.fn().mockReturnValue(mockSafeProfile),
     };
@@ -91,10 +94,11 @@ describe('UsersController', () => {
   });
 
   describe('findAll (GET /users)', () => {
-    it('should list all users for admin', async () => {
-      const res = await controller.findAll();
-      expect(Array.isArray(res)).toBe(true);
-      expect(service.findAll).toHaveBeenCalled();
+    it('should list users with pagination for admin', async () => {
+      const res = await controller.findAll({ page: 1, limit: 20 });
+      expect(res.items).toHaveLength(1);
+      expect(res.meta.total).toBe(1);
+      expect(service.findAll).toHaveBeenCalledWith(1, 20);
     });
   });
 });
