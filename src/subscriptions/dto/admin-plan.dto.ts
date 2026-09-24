@@ -10,7 +10,20 @@ import {
   IsString,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
+
+/** Preserve explicit `null` (unlimited) while coercing numeric strings/numbers. */
+function transformNullableRequestLimit({ value }: { value: unknown }): number | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === null || value === '') {
+    return null;
+  }
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : (value as number);
+}
 
 export class AdminCreatePlanDto {
   @ApiProperty({
@@ -81,7 +94,8 @@ export class AdminCreatePlanDto {
     nullable: true,
   })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(transformNullableRequestLimit)
+  @ValidateIf((_, value) => value !== null && value !== undefined)
   @IsInt({ message: 'requestLimit must be an integer' })
   @Min(1, { message: 'requestLimit must be at least 1' })
   requestLimit?: number | null;
@@ -135,7 +149,8 @@ export class AdminUpdatePlanDto {
 
   @ApiPropertyOptional({ example: 15000, nullable: true })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(transformNullableRequestLimit)
+  @ValidateIf((_, value) => value !== null && value !== undefined)
   @IsInt({ message: 'requestLimit must be an integer' })
   @Min(1, { message: 'requestLimit must be at least 1' })
   requestLimit?: number | null;

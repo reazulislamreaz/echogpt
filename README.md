@@ -42,7 +42,7 @@ The API is versioned under `/api/v1` and ships with interactive Swagger/OpenAPI 
 | OpenAI / Anthropic / Gemini HTTP APIs | AI chat completions (via provider adapters) |
 | Serper (configurable) | Web search provider integration |
 | Swagger (`@nestjs/swagger`) | Interactive OpenAPI documentation |
-| Docker Compose | Local PostgreSQL / Redis (and optional API image) |
+| Docker Compose | Optional local PostgreSQL / Redis (and optional API image) |
 | Jest + Supertest | Unit and end-to-end tests |
 | ESLint + Prettier | Linting and formatting |
 
@@ -59,7 +59,7 @@ Guards / Validation — JWT auth, roles, subscription quota, ValidationPipe
     ↓
 Application service — business rules and transactions
     ↓
-Prisma / externals  — PostgreSQL, AI providers, search, SMTP, Redis
+Prisma / externals  — PostgreSQL, AI providers, search, SMTP, Redis (optional)
     ↓
 HTTP response       — typed DTOs or SSE stream
 ```
@@ -118,8 +118,90 @@ echogpt/
 
 - Node.js 22+ (Dockerfile uses `node:22-alpine`)
 - npm
-- Docker (recommended for PostgreSQL and Redis)
-- Or a reachable PostgreSQL 16 instance
+- **PostgreSQL** (required) — local install or Docker
+- **Redis** (optional) — leave disabled unless you want search caching / Redis-backed throttling
+- **Docker** (optional) — convenience for running PostgreSQL and/or Redis; not mandatory
+
+## Database & Infrastructure Setup
+
+EchoGPT uses **PostgreSQL** as its primary database and **Redis** as an optional infrastructure dependency.
+
+### Option A — Use Local PostgreSQL
+
+Install and run PostgreSQL on your machine (without Docker), create a database (for example `echogpt`), then set:
+
+```env
+DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/echogpt
+```
+
+Generate the Prisma Client and apply migrations:
+
+```bash
+npx prisma generate
+npx prisma migrate deploy
+```
+
+### Option B — Use Docker
+
+Docker can run PostgreSQL for you. From the project root:
+
+```bash
+docker compose up -d postgres
+```
+
+Compose defaults (`docker-compose.yml`):
+
+- User: `echogpt`
+- Password: `echogpt`
+- Database: `echogpt`
+- Port: `5432`
+
+Example `DATABASE_URL` for this service:
+
+```env
+DATABASE_URL=postgresql://echogpt:echogpt@localhost:5432/echogpt?schema=public
+```
+
+Then generate the Prisma Client and apply migrations:
+
+```bash
+npx prisma generate
+npx prisma migrate deploy
+```
+
+### Redis (Optional)
+
+Redis is **optional**. The application starts and operates without it (fail-open design).
+
+When Redis is available and `REDIS_HOST` is set, it is used for:
+
+- Web-search result caching
+- Distributed HTTP rate-limit storage
+
+When Redis is unavailable or `REDIS_HOST` is empty:
+
+- Web-search caching is bypassed
+- The rate limiter falls back to in-memory storage
+- Core API functionality (auth, users, subscriptions, chat, search, admin) remains available
+
+To run Redis with Docker:
+
+```bash
+docker compose up -d redis
+```
+
+Then set in `.env` (example):
+
+```env
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+```
+
+To start PostgreSQL and Redis together (optional convenience only):
+
+```bash
+docker compose up -d postgres redis
+```
 
 ## Getting started
 
@@ -141,31 +223,27 @@ Set at least:
 
 | Variable | Notes |
 | --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_URL` | PostgreSQL connection string (required) |
 | `JWT_ACCESS_SECRET` | Strong secret for access tokens (or legacy `JWT_SECRET`) |
 | `ENCRYPTION_KEY` | Secret used to derive AES-256-GCM key for provider API keys |
 
-Example local database URL when using Compose Postgres:
+Example:
 
 ```env
-DATABASE_URL=postgresql://echogpt:echogpt@localhost:5432/echogpt?schema=public
+DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/echogpt
 JWT_ACCESS_SECRET=change-me-to-a-long-random-string
 ENCRYPTION_KEY=change-me-to-another-long-random-string
 ```
 
-### 3. Start infrastructure
+Leave `REDIS_HOST` empty unless you intentionally enable optional Redis.
+
+### 3. Database setup
+
+Follow [Database & Infrastructure Setup](#database--infrastructure-setup) (local PostgreSQL or Docker). Ensure `npx prisma generate` and `npx prisma migrate deploy` have been run.
+
+### 4. Seed reference data
 
 ```bash
-docker compose up -d postgres redis
-```
-
-Redis is optional for core API behavior. Leave `REDIS_HOST` empty to disable Redis; set `REDIS_HOST=127.0.0.1` to enable caching/throttle storage.
-
-### 4. Database migrate and seed
-
-```bash
-npx prisma generate
-npx prisma migrate deploy
 npm run prisma:seed
 ```
 
@@ -246,6 +324,8 @@ Incomplete SMTP configuration fails environment validation. Unavailable SMTP doe
 
 ### Redis (optional)
 
+Redis is not required. Keep `REDIS_HOST` empty to run without Redis.
+
 | Variable | Default | Description |
 | --- | --- | --- |
 | `REDIS_HOST` | empty | Empty disables Redis |
@@ -263,7 +343,7 @@ Incomplete SMTP configuration fails environment validation. Unavailable SMTP doe
 | `THROTTLE_TTL_MS` | `60000` | Window length in ms |
 | `THROTTLE_LIMIT` | `100` | Max requests per window |
 
-Uses Redis when available; otherwise in-memory storage (fail-open for Redis outages).
+Uses Redis for throttle storage when Redis is configured and available; otherwise falls back to in-memory storage (fail-open).
 
 ### AI and web search
 
@@ -447,7 +527,21 @@ E2E setup forces `EMAIL_MOCK=true` and raises `THROTTLE_LIMIT` so tests do not s
 
 ## Docker
 
-**Infrastructure only (typical local workflow):**
+Docker is **optional**. Use it only if you prefer containers over a local PostgreSQL install.
+
+**PostgreSQL only (required database via Compose):**
+
+```bash
+docker compose up -d postgres
+```
+
+**Redis only (optional):**
+
+```bash
+docker compose up -d redis
+```
+
+**PostgreSQL + Redis (optional convenience):**
 
 ```bash
 docker compose up -d postgres redis
@@ -460,7 +554,7 @@ docker compose up -d postgres redis
 docker compose --profile full up -d --build
 ```
 
-The `api` service is behind Compose profile `full`. It injects `DATABASE_URL` and Redis host for the Compose network.
+The `api` service is behind Compose profile `full`. That profile wires Compose Postgres and Redis into the API container; for a normal local Node process you only need PostgreSQL (and Redis only if you enable it).
 
 ## Known limitations
 
