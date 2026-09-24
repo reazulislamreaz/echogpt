@@ -21,6 +21,13 @@ export interface ChatCompletionResult {
   raw?: Record<string, unknown>;
 }
 
+export type ChatCompletionStreamChunk =
+  | { type: 'delta'; text: string }
+  | {
+      type: 'done';
+      result: ChatCompletionResult;
+    };
+
 export class AiProviderRequestError extends Error {
   constructor(
     message: string,

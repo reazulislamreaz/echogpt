@@ -18,6 +18,20 @@ export default registerAs('app', () => ({
   auth: {
     bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS ?? '10', 10),
     verificationExpiresHours: parseInt(process.env.EMAIL_VERIFICATION_EXPIRES_HOURS ?? '24', 10),
+    requireEmailVerification: (process.env.REQUIRE_EMAIL_VERIFICATION ?? 'false') === 'true',
+  },
+  redis: {
+    host: process.env.REDIS_HOST,
+    port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
+    password: process.env.REDIS_PASSWORD,
+    db: parseInt(process.env.REDIS_DB ?? '0', 10),
+    keyPrefix: process.env.REDIS_KEY_PREFIX ?? 'echogpt:',
+    connectTimeoutMs: parseInt(process.env.REDIS_CONNECT_TIMEOUT_MS ?? '2000', 10),
+    commandTimeoutMs: parseInt(process.env.REDIS_COMMAND_TIMEOUT_MS ?? '1000', 10),
+  },
+  throttle: {
+    ttlMs: parseInt(process.env.THROTTLE_TTL_MS ?? '60000', 10),
+    limit: parseInt(process.env.THROTTLE_LIMIT ?? '100', 10),
   },
   smtp: {
     host: process.env.SMTP_HOST,
@@ -44,6 +58,7 @@ export default registerAs('app', () => ({
     baseUrl: process.env.WEB_SEARCH_BASE_URL,
     requestTimeoutMs: parseInt(process.env.WEB_SEARCH_TIMEOUT_MS ?? '15000', 10),
     defaultLimit: parseInt(process.env.WEB_SEARCH_DEFAULT_LIMIT ?? '10', 10),
+    cacheTtlSeconds: parseInt(process.env.WEB_SEARCH_CACHE_TTL_SECONDS ?? '300', 10),
   },
   database: {
     url: process.env.DATABASE_URL as string,

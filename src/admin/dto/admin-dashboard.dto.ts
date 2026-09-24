@@ -279,6 +279,22 @@ export class AdminSystemHealthDto {
     status: 'connected' | 'disconnected';
   };
 
+  @ApiPropertyOptional({
+    example: { status: 'disabled' },
+    description: 'Optional Redis — unavailable Redis does not degrade overall status',
+  })
+  redis?: {
+    status: 'up' | 'down' | 'disabled';
+  };
+
+  @ApiPropertyOptional({
+    example: { status: 'unconfigured' },
+    description: 'Optional SMTP configuration status',
+  })
+  smtp?: {
+    status: 'configured' | 'unconfigured';
+  };
+
   @ApiProperty({ example: 12345.6 })
   uptimeSeconds!: number;
 

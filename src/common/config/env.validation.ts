@@ -156,6 +156,58 @@ class EnvironmentVariables {
   @Max(20)
   @IsOptional()
   WEB_SEARCH_DEFAULT_LIMIT: number = 10;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  WEB_SEARCH_CACHE_TTL_SECONDS: number = 300;
+
+  @IsBooleanString()
+  @IsOptional()
+  REQUIRE_EMAIL_VERIFICATION: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  REDIS_HOST?: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  @IsOptional()
+  REDIS_PORT: number = 6379;
+
+  @IsString()
+  @IsOptional()
+  REDIS_PASSWORD?: string;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  REDIS_DB: number = 0;
+
+  @IsString()
+  @IsOptional()
+  REDIS_KEY_PREFIX: string = 'echogpt:';
+
+  @IsInt()
+  @Min(100)
+  @IsOptional()
+  REDIS_CONNECT_TIMEOUT_MS: number = 2000;
+
+  @IsInt()
+  @Min(100)
+  @IsOptional()
+  REDIS_COMMAND_TIMEOUT_MS: number = 1000;
+
+  @IsInt()
+  @Min(1000)
+  @IsOptional()
+  THROTTLE_TTL_MS: number = 60000;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  THROTTLE_LIMIT: number = 100;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {

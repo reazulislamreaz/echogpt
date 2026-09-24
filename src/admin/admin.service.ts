@@ -4,7 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { HttpMethod, Prisma, SubscriptionStatus } from '@prisma/client';
+import { RedisService } from '../common/redis/redis.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RoleType } from '../roles/enums/role.enum';
 import { UserResponseDto } from '../users/dto/user-response.dto';
@@ -28,6 +30,8 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly usersService: UsersService,
+    private readonly redis: RedisService,
+    private readonly configService: ConfigService,
   ) {}
 
   async getDashboardStats(): Promise<AdminDashboardStatsDto> {
@@ -586,12 +590,21 @@ export class AdminService {
       }),
     ]);
 
+    const redisHost = this.configService.get<string>('app.redis.host')?.trim();
+    const smtpHost = this.configService.get<string>('app.smtp.host')?.trim();
+
     return {
       status: databaseUp ? 'ok' : 'degraded',
       service: 'echogpt-backend',
       version: process.env.npm_package_version ?? '0.1.0',
       database: {
         status: databaseUp ? 'connected' : 'disconnected',
+      },
+      redis: {
+        status: !redisHost ? 'disabled' : this.redis.isAvailable() ? 'up' : 'down',
+      },
+      smtp: {
+        status: smtpHost ? 'configured' : 'unconfigured',
       },
       uptimeSeconds: Math.round(process.uptime() * 100) / 100,
       providers: {
@@ -671,20 +684,22 @@ export class AdminService {
   private async getUsageByDay(
     where: Prisma.APIUsageLogWhereInput,
   ): Promise<Array<{ date: string; requestCount: number }>> {
+    const createdAt =
+      where.createdAt && typeof where.createdAt === 'object' ? where.createdAt : undefined;
     const from =
-      where.createdAt && typeof where.createdAt === 'object' && 'gte' in where.createdAt
-        ? (where.createdAt.gte as Date | undefined)
-        : undefined;
-    const to =
-      where.createdAt && typeof where.createdAt === 'object' && 'lt' in where.createdAt
-        ? (where.createdAt.lt as Date | undefined)
-        : undefined;
+      createdAt && 'gte' in createdAt ? (createdAt.gte as Date | undefined) : undefined;
+    const to = createdAt && 'lt' in createdAt ? (createdAt.lt as Date | undefined) : undefined;
+
+    // Default to last 30 days when callers omit a window to avoid full-table scans.
+    const effectiveFrom =
+      from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const effectiveTo = to ?? new Date();
 
     const rows = await this.prisma.$queryRaw<Array<{ day: Date; request_count: bigint }>>`
       SELECT DATE_TRUNC('day', created_at) AS day, COUNT(*)::bigint AS request_count
       FROM api_usage_logs
-      WHERE (${from}::timestamptz IS NULL OR created_at >= ${from})
-        AND (${to}::timestamptz IS NULL OR created_at < ${to})
+      WHERE created_at >= ${effectiveFrom}
+        AND created_at < ${effectiveTo}
       GROUP BY 1
       ORDER BY 1 DESC
       LIMIT 30

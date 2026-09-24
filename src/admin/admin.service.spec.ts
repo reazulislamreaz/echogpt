@@ -1,5 +1,7 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
+import { RedisService } from '../common/redis/redis.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { RoleType } from '../roles/enums/role.enum';
 import { UsersService } from '../users/users.service';
@@ -60,6 +62,16 @@ describe('AdminService', () => {
         AdminService,
         { provide: PrismaService, useValue: prisma },
         { provide: UsersService, useValue: usersService },
+        {
+          provide: RedisService,
+          useValue: { isAvailable: jest.fn().mockReturnValue(false) },
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockReturnValue(''),
+          },
+        },
       ],
     }).compile();
 

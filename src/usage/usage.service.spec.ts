@@ -82,4 +82,17 @@ describe('UsageService', () => {
       });
     });
   });
+
+  describe('safeRecordUsage', () => {
+    it('swallows persistence failures', async () => {
+      prisma.aPIUsageLog.create.mockRejectedValue(new Error('db down'));
+      await expect(
+        service.safeRecordUsage({
+          endpoint: '/api/v1/test',
+          statusCode: 200,
+          responseTimeMs: 1,
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { APIUsageLog, HttpMethod } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -21,6 +21,8 @@ export interface RecordUsageParams {
 
 @Injectable()
 export class UsageService {
+  private readonly logger = new Logger(UsageService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -78,5 +80,20 @@ export class UsageService {
         errorMessage: params.errorMessage ?? null,
       },
     });
+  }
+
+  /**
+   * Best-effort usage logging. Failures are logged and never fail the primary request.
+   */
+  async safeRecordUsage(params: RecordUsageParams): Promise<void> {
+    try {
+      await this.recordUsage(params);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record usage for ${params.endpoint}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
+    }
   }
 }

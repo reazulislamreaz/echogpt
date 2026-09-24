@@ -11,6 +11,7 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -25,7 +26,7 @@ import {
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
@@ -155,5 +156,64 @@ export class ChatController {
       ipAddress,
       userAgent,
     });
+  }
+
+  @Post(':id/messages/stream')
+  @UseGuards(SubscriptionUsageGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Send a chat message and stream the AI response (SSE)',
+    description:
+      'Server-Sent Events stream. Emits `chunk` events with partial text, then a final `done` event with persisted messages. Failed streams do not consume successful usage quota.',
+  })
+  @ApiOkResponse({
+    description:
+      'text/event-stream: event=chunk data={"text":"..."} ; event=done data={userMessage,assistantMessage} ; event=error data={message,statusCode}',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid provider/model/key configuration' })
+  @ApiNotFoundResponse({ description: 'Conversation or provider not found' })
+  @ApiForbiddenResponse({ description: 'Ownership violation' })
+  @ApiTooManyRequestsResponse({ description: 'Subscription or HTTP rate limit exceeded' })
+  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  async streamMessage(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SendMessageDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
+    const userAgent = req.headers['user-agent'];
+    const abort = new AbortController();
+    const onClose = () => abort.abort();
+    req.once('close', onClose);
+
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders?.();
+
+    try {
+      for await (const event of this.chatService.streamMessage(user.id, id, dto, {
+        ipAddress,
+        userAgent,
+        signal: abort.signal,
+      })) {
+        if (abort.signal.aborted || res.writableEnded) {
+          break;
+        }
+        res.write(`event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`);
+      }
+    } catch (error) {
+      if (!res.writableEnded && !abort.signal.aborted) {
+        const message = error instanceof Error ? error.message : 'Streaming chat request failed';
+        res.write(`event: error\ndata: ${JSON.stringify({ message, statusCode: 500 })}\n\n`);
+      }
+    } finally {
+      req.off('close', onClose);
+      if (!res.writableEnded) {
+        res.end();
+      }
+    }
   }
 }

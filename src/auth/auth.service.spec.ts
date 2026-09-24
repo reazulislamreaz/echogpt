@@ -302,6 +302,71 @@ describe('AuthService', () => {
         }),
       ).rejects.toThrow(UnauthorizedException);
     });
+
+    it('should reject unverified login when REQUIRE_EMAIL_VERIFICATION is enabled', async () => {
+      const config = (authService as any).configService;
+      config.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'app.auth.requireEmailVerification') return true;
+        const configMap: Record<string, unknown> = {
+          'app.jwt.accessSecret': 'test-access-secret',
+          'app.jwt.accessExpiresIn': '15m',
+          'app.jwt.refreshExpiresIn': '7d',
+          'app.auth.bcryptSaltRounds': 10,
+          'app.auth.verificationExpiresHours': 24,
+        };
+        return configMap[key] ?? defaultValue;
+      });
+
+      prismaService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: false,
+      });
+
+      await expect(
+        authService.login({
+          email: 'test@example.com',
+          password: 'StrongPassword123!',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('should allow verified login when REQUIRE_EMAIL_VERIFICATION is enabled', async () => {
+      const config = (authService as any).configService;
+      config.get.mockImplementation((key: string, defaultValue?: unknown) => {
+        if (key === 'app.auth.requireEmailVerification') return true;
+        const configMap: Record<string, unknown> = {
+          'app.jwt.accessSecret': 'test-access-secret',
+          'app.jwt.accessExpiresIn': '15m',
+          'app.jwt.refreshExpiresIn': '7d',
+          'app.auth.bcryptSaltRounds': 10,
+          'app.auth.verificationExpiresHours': 24,
+        };
+        return configMap[key] ?? defaultValue;
+      });
+
+      prismaService.user.findUnique.mockResolvedValue({
+        ...mockUser,
+        isEmailVerified: true,
+      });
+      prismaService.session.create.mockResolvedValue({
+        id: 'session-id',
+        userId: mockUser.id,
+        refreshTokenHash: 'hash',
+        userAgent: null,
+        ipAddress: null,
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      const result = await authService.login({
+        email: 'test@example.com',
+        password: 'StrongPassword123!',
+      });
+
+      expect(result.accessToken).toBeDefined();
+    });
   });
 
   describe('Refresh Token Rotation & Replay Protection', () => {
