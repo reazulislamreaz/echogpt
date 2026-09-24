@@ -24,10 +24,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
         const expiresIn = (configService.get<string>('app.jwt.accessExpiresIn') ??
           '15m') as `${number}${'s' | 'm' | 'h' | 'd'}`;
         return {
-          secret:
-            configService.get<string>('app.jwt.accessSecret') ??
-            configService.get<string>('app.jwt.secret') ??
-            'change-me-access-secret',
+          secret: configService.getOrThrow<string>('app.jwt.accessSecret'),
           signOptions: {
             expiresIn,
           },

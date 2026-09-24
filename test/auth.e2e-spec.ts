@@ -331,9 +331,10 @@ describe('Authentication & Authorization (e2e)', () => {
         .set('Authorization', `Bearer ${adminAccessToken}`)
         .expect(200);
 
-      expect(Array.isArray(res.body)).toBe(true);
-      expect(res.body.length).toBeGreaterThan(0);
-      expect(res.body[0].passwordHash).toBeUndefined();
+      expect(Array.isArray(res.body.items)).toBe(true);
+      expect(res.body.items.length).toBeGreaterThan(0);
+      expect(res.body.meta).toBeDefined();
+      expect(res.body.items[0].passwordHash).toBeUndefined();
     });
   });
 });

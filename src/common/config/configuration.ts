@@ -11,11 +11,9 @@ export default registerAs('app', () => ({
     path: process.env.SWAGGER_PATH ?? 'docs',
   },
   jwt: {
-    accessSecret:
-      process.env.JWT_ACCESS_SECRET ?? process.env.JWT_SECRET ?? 'change-me-access-secret',
+    accessSecret: process.env.JWT_ACCESS_SECRET ?? process.env.JWT_SECRET,
     accessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN ?? '15m',
-    refreshSecret:
-      process.env.JWT_REFRESH_SECRET ?? process.env.JWT_SECRET ?? 'change-me-refresh-secret',
+    refreshSecret: process.env.JWT_REFRESH_SECRET ?? process.env.JWT_SECRET,
     refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
   },
   auth: {

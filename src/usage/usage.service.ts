@@ -26,7 +26,7 @@ export class UsageService {
   /**
    * Calculates metered request count for a user within a [startDate, endDate) interval.
    * Performs an efficient database COUNT aggregation.
-   * Excludes unmetered/system logs (where userId is NULL) and failed requests (statusCode >= 400).
+   * Excludes unmetered/system logs (where userId is NULL).
    */
   async getUsageCount(userId: string, startDate: Date, endDate: Date): Promise<number> {
     if (!userId) {
@@ -39,9 +39,6 @@ export class UsageService {
         createdAt: {
           gte: startDate,
           lt: endDate,
-        },
-        statusCode: {
-          lt: 400,
         },
       },
     });

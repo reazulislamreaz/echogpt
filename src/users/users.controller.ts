@@ -9,6 +9,7 @@ import {
   Param,
   ParseUUIDPipe,
   Patch,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -21,6 +22,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
@@ -116,24 +118,25 @@ export class UsersController {
   @UseGuards(RolesGuard)
   @Roles(RoleType.ADMIN)
   @ApiOperation({
-    summary: 'List all users (Admin only)',
+    summary: 'List users with pagination (Admin only)',
     description:
-      'Returns a list of all registered users in safe representation. Requires ADMIN role.',
+      'Returns a paginated list of registered users in safe representation. Requires ADMIN role.',
   })
   @ApiOkResponse({
-    description: 'List of all users',
-    type: [UserResponseDto],
+    description: 'Paginated list of users',
   })
   @ApiUnauthorizedResponse({ description: 'Authentication required' })
   @ApiForbiddenResponse({ description: 'ADMIN role required' })
-  async findAll(): Promise<UserResponseDto[]> {
-    return this.usersService.findAll();
+  async findAll(@Query() query: PaginationQueryDto) {
+    return this.usersService.findAll(query.page, query.limit);
   }
 
   @Get(':id')
+  @UseGuards(RolesGuard)
+  @Roles(RoleType.ADMIN)
   @ApiOperation({
-    summary: 'Get user by ID',
-    description: 'Retrieves safe user information for a given user ID.',
+    summary: 'Get user by ID (Admin only)',
+    description: 'Retrieves safe user information for a given user ID. Requires ADMIN role.',
   })
   @ApiOkResponse({
     description: 'User details',
@@ -141,6 +144,7 @@ export class UsersController {
   })
   @ApiNotFoundResponse({ description: 'User not found' })
   @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiForbiddenResponse({ description: 'ADMIN role required' })
   async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<UserResponseDto> {
     const user = await this.usersService.findById(id);
     if (!user) {
