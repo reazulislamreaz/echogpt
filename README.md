@@ -17,7 +17,8 @@ Production-oriented NestJS REST API for the EchoGPT Chrome Extension.
 
 ```bash
 cp .env.example .env
-# Fill DATABASE_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, ENCRYPTION_KEY
+# Fill DATABASE_URL, JWT_ACCESS_SECRET, ENCRYPTION_KEY
+# Optional: SMTP_* for verification email; WEB_SEARCH_API_KEY for live search
 npm install
 npx prisma generate
 docker compose up -d postgres
@@ -54,15 +55,25 @@ Change this password in any shared/non-local environment.
 
 ## Environment
 
-See `.env.example` for placeholders. Important variables:
+Copy `.env.example` to `.env` and fill required values. Never commit `.env`.
+
+**Required**
 
 - `DATABASE_URL`
-- `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET`
-- `ENCRYPTION_KEY` (AES-256-GCM for AI provider keys)
-- `AI_COMPLETION_MOCK` / `AI_REQUEST_TIMEOUT_MS`
-- `WEB_SEARCH_MOCK` / `WEB_SEARCH_PROVIDER` / `WEB_SEARCH_API_KEY`
+- `JWT_ACCESS_SECRET`
+- `ENCRYPTION_KEY`
 
-Never commit a real `.env` file.
+**Optional (defaults in `.env.example`)**
+
+- App: `NODE_ENV`, `PORT`, `API_PREFIX`, `API_VERSION`, `CORS_ORIGIN`, `SWAGGER_*`
+- Auth: `JWT_ACCESS_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`, `BCRYPT_SALT_ROUNDS`, `EMAIL_VERIFICATION_EXPIRES_HOURS`
+- SMTP: `SMTP_*`, `EMAIL_VERIFICATION_URL` (all-or-nothing when enabling email)
+- AI / search: `AI_*`, `WEB_SEARCH_*`
+
+**Test-only**
+
+- `EMAIL_MOCK` — e2e sets `true` via `test/setup-e2e.ts`
+- `AI_COMPLETION_MOCK` / `WEB_SEARCH_MOCK` — used by chat/search e2e when live providers are not available
 
 ## Project structure
 
@@ -84,22 +95,24 @@ src/
 Configure SMTP in `.env` (see `.env.example`):
 
 ```bash
-SMTP_HOST=smtp.gmail.com
+SMTP_HOST=
 SMTP_PORT=587
 SMTP_SECURE=false
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-SMTP_FROM=your-email@gmail.com
+SMTP_USER=
+SMTP_PASS=
+SMTP_FROM=
 SMTP_FROM_NAME=EchoGPT
 EMAIL_VERIFICATION_URL=http://localhost:3000/api/v1/auth/verify-email
+EMAIL_MOCK=false
 ```
 
 Notes:
 
-- SMTP is optional at startup in every environment. Incomplete or unavailable SMTP does not crash the app.
+- SMTP is optional at startup. Incomplete or unavailable SMTP does not crash the app.
+- When enabling SMTP, set `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, and `EMAIL_VERIFICATION_URL` together.
 - Registration still succeeds if email delivery fails; use `POST /auth/resend-verification` once SMTP is available.
-- Automated e2e tests set `EMAIL_MOCK=true` so they never send real mail.
-- Gmail requires an **App Password** (2-Step Verification), not your normal account password.
+- E2E tests force `EMAIL_MOCK=true` so they never send real mail.
+- Gmail requires an App Password (2-Step Verification), not your normal account password.
 - Verification link format: `EMAIL_VERIFICATION_URL?token=<raw-token>`
 - Endpoints: `GET|POST /api/v1/auth/verify-email`, `POST /api/v1/auth/resend-verification`
 - Raw tokens are never stored, logged, or returned from APIs.
