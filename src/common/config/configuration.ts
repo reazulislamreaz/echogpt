@@ -20,6 +20,9 @@ export default registerAs('app', () => ({
     bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS ?? '10', 10),
     verificationExpiresHours: parseInt(process.env.EMAIL_VERIFICATION_EXPIRES_HOURS ?? '24', 10),
   },
+  encryption: {
+    key: process.env.ENCRYPTION_KEY,
+  },
   database: {
     url: process.env.DATABASE_URL as string,
   },
