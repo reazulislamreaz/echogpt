@@ -65,6 +65,17 @@ describe('AuthService', () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      subscriptionPlan: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'free-plan-id',
+          name: 'FREE',
+          slug: 'free',
+          billingCycle: 'monthly',
+        }),
+      },
+      subscription: {
+        create: jest.fn().mockResolvedValue({ id: 'sub-id' }),
+      },
       $transaction: jest.fn().mockImplementation(async (callback) => {
         if (typeof callback === 'function') {
           return callback(mockPrisma);

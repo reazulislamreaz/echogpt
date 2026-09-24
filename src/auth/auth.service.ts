@@ -109,6 +109,28 @@ export class AuthService {
         },
       });
 
+      // Automatically provision default FREE subscription tier
+      const freePlan = await tx.subscriptionPlan.findUnique({
+        where: { slug: 'free' },
+      });
+
+      if (freePlan) {
+        const now = new Date();
+        const currentPeriodEnd = new Date(now.getTime());
+        currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+
+        await tx.subscription.create({
+          data: {
+            userId: createdUser.id,
+            planId: freePlan.id,
+            status: 'ACTIVE',
+            startDate: now,
+            currentPeriodStart: now,
+            currentPeriodEnd,
+          },
+        });
+      }
+
       return createdUser;
     });
 
