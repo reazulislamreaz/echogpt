@@ -27,6 +27,14 @@ export default registerAs('app', () => ({
     mockCompletions: (process.env.AI_COMPLETION_MOCK ?? 'false') === 'true',
     requestTimeoutMs: parseInt(process.env.AI_REQUEST_TIMEOUT_MS ?? '30000', 10),
   },
+  webSearch: {
+    mock: (process.env.WEB_SEARCH_MOCK ?? 'false') === 'true',
+    provider: process.env.WEB_SEARCH_PROVIDER ?? 'serper',
+    apiKey: process.env.WEB_SEARCH_API_KEY,
+    baseUrl: process.env.WEB_SEARCH_BASE_URL,
+    requestTimeoutMs: parseInt(process.env.WEB_SEARCH_TIMEOUT_MS ?? '15000', 10),
+    defaultLimit: parseInt(process.env.WEB_SEARCH_DEFAULT_LIMIT ?? '10', 10),
+  },
   database: {
     url: process.env.DATABASE_URL as string,
   },
