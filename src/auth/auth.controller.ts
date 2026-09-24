@@ -1,10 +1,21 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiConflictResponse,
   ApiInternalServerErrorResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
@@ -127,6 +138,30 @@ export class AuthController {
   @ApiUnauthorizedResponse({ description: 'Authentication token required' })
   async getMe(@CurrentUser() user: AuthenticatedUser): Promise<UserResponseDto> {
     return this.authService.getCurrentUser(user.id);
+  }
+
+  @Get('verify-email')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Verify email address via link',
+    description:
+      'Accepts the verification token from the email link query string (?token=...). Marks the account verified when the token is valid.',
+  })
+  @ApiQuery({
+    name: 'token',
+    required: true,
+    description: 'Raw verification token from the email link',
+  })
+  @ApiOkResponse({
+    description: 'Email successfully verified',
+    type: MessageResponseDto,
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Invalid, expired, or previously used verification token',
+  })
+  async verifyEmailFromLink(@Query('token') token: string): Promise<MessageResponseDto> {
+    return this.authService.verifyEmail(token);
   }
 
   @Post('verify-email')

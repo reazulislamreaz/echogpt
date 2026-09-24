@@ -71,6 +71,40 @@ class EnvironmentVariables {
   @IsOptional()
   EMAIL_VERIFICATION_EXPIRES_HOURS: number = 24;
 
+  @IsString()
+  @IsOptional()
+  SMTP_HOST?: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  @IsOptional()
+  SMTP_PORT: number = 587;
+
+  @IsBooleanString()
+  @IsOptional()
+  SMTP_SECURE: string = 'false';
+
+  @IsString()
+  @IsOptional()
+  SMTP_USER?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_PASS?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_FROM?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_FROM_NAME: string = 'EchoGPT';
+
+  @IsString()
+  @IsOptional()
+  EMAIL_VERIFICATION_URL?: string;
+
   @IsBooleanString()
   @IsOptional()
   SWAGGER_ENABLED: string = 'true';
@@ -143,6 +177,28 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
   if (!validated.JWT_ACCESS_SECRET && !validated.JWT_SECRET) {
     throw new Error(
       'Environment validation failed: Either JWT_ACCESS_SECRET or JWT_SECRET must be configured',
+    );
+  }
+
+  const smtpFields = [
+    validated.SMTP_HOST,
+    validated.SMTP_USER,
+    validated.SMTP_PASS,
+    validated.SMTP_FROM,
+    validated.EMAIL_VERIFICATION_URL,
+  ];
+  const smtpConfiguredCount = smtpFields.filter((value) =>
+    Boolean(value && String(value).trim()),
+  ).length;
+  if (smtpConfiguredCount > 0 && smtpConfiguredCount < smtpFields.length) {
+    throw new Error(
+      'Environment validation failed: Email service configuration is incomplete. Set SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM, and EMAIL_VERIFICATION_URL together.',
+    );
+  }
+
+  if (validated.NODE_ENV === NodeEnvironment.Production && smtpConfiguredCount === 0) {
+    throw new Error(
+      'Environment validation failed: Email service configuration is incomplete for production.',
     );
   }
 

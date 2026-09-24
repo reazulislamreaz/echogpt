@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -142,8 +143,20 @@ export class AuthService {
       throw error;
     }
 
-    // Dispatch verification email (non-blocking simulation / queue)
-    await this.emailService.sendVerificationEmail(normalizedEmail, rawVerificationToken);
+    // Dispatch verification email after user creation succeeds.
+    // Delivery failures are logged; the account remains usable via resend-verification.
+    try {
+      await this.emailService.sendVerificationEmail(
+        normalizedEmail,
+        rawVerificationToken,
+        newUser.firstName,
+      );
+    } catch (error) {
+      // Do not roll back registration; user can request a new verification email.
+      if (!(error instanceof ServiceUnavailableException)) {
+        throw error;
+      }
+    }
 
     return {
       message: 'User registered successfully. Please check your email to verify your account.',
@@ -436,7 +449,13 @@ export class AuthService {
       });
     });
 
-    await this.emailService.sendVerificationEmail(user.email, rawToken);
+    try {
+      await this.emailService.sendVerificationEmail(user.email, rawToken, user.firstName);
+    } catch (error) {
+      if (!(error instanceof ServiceUnavailableException)) {
+        throw error;
+      }
+    }
 
     return genericResponse;
   }
