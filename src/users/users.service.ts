@@ -1,6 +1,16 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma, User } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UserMessageResponseDto } from './dto/user-message-response.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 
 export type UserWithRole = User & {
@@ -13,7 +23,10 @@ export type UserWithRole = User & {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * Finds a user by unique ID including their assigned role.
@@ -62,6 +75,139 @@ export class UsersService {
     return this.prisma.role.findUnique({
       where: { name },
     });
+  }
+
+  /**
+   * Retrieves the authenticated user profile in safe representation.
+   */
+  async getCurrentUserProfile(userId: string): Promise<UserResponseDto> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User account does not exist');
+    }
+    this.validateAccountStatus(user);
+    return this.toSafeUser(user);
+  }
+
+  /**
+   * Updates allowed profile attributes (firstName, lastName, avatarUrl).
+   */
+  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<UserResponseDto> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User account does not exist');
+    }
+    this.validateAccountStatus(user);
+
+    const dataToUpdate: Prisma.UserUpdateInput = {};
+    if (dto.firstName !== undefined) {
+      dataToUpdate.firstName = dto.firstName;
+    }
+    if (dto.lastName !== undefined) {
+      dataToUpdate.lastName = dto.lastName;
+    }
+    if (dto.avatarUrl !== undefined) {
+      dataToUpdate.avatarUrl = dto.avatarUrl;
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: dataToUpdate,
+      include: {
+        role: true,
+      },
+    });
+
+    return this.toSafeUser(updated);
+  }
+
+  /**
+   * Validates current password, hashes new password, updates database,
+   * and revokes all active refresh-token sessions in a transaction.
+   */
+  async changePassword(userId: string, dto: ChangePasswordDto): Promise<UserMessageResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User account does not exist');
+    }
+
+    this.validateAccountStatus(user);
+
+    const isMatch = await bcrypt.compare(dto.currentPassword, user.passwordHash);
+    if (!isMatch) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+
+    const isSamePassword = await bcrypt.compare(dto.newPassword, user.passwordHash);
+    if (isSamePassword) {
+      throw new BadRequestException('New password cannot be the same as current password');
+    }
+
+    const saltRounds = this.configService.get<number>('app.auth.bcryptSaltRounds', 10);
+    const newPasswordHash = await bcrypt.hash(dto.newPassword, saltRounds);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { passwordHash: newPasswordHash },
+      });
+
+      await tx.session.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    });
+
+    return {
+      message: 'Password changed successfully. Please log in again with your new password.',
+    };
+  }
+
+  /**
+   * Soft-deletes user account by setting deletedAt and isActive = false,
+   * and revokes all active sessions in a single transaction.
+   */
+  async softDeleteAccount(userId: string): Promise<UserMessageResponseDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User account does not exist');
+    }
+
+    this.validateAccountStatus(user);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          deletedAt: new Date(),
+          isActive: false,
+        },
+      });
+
+      await tx.session.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    });
+
+    return { message: 'Account successfully deleted' };
+  }
+
+  /**
+   * Revokes all active refresh-token sessions for a user.
+   */
+  async revokeUserSessions(userId: string): Promise<number> {
+    const result = await this.prisma.session.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    return result.count;
   }
 
   /**
