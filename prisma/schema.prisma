@@ -1,6 +1,4 @@
-// EchoGPT Backend — Prisma schema foundation.
-// Business models (User, Role, Session, Subscription, Provider, Chat, Search, Usage)
-// will be introduced in later steps. Keep this file minimal until then.
+// EchoGPT Backend — Complete Normalized PostgreSQL Schema (Step 4)
 
 generator client {
   provider = "prisma-client-js"
@@ -9,4 +7,257 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  EXPIRED
+  PAST_DUE
+  TRIALING
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum HttpMethod {
+  GET
+  POST
+  PUT
+  PATCH
+  DELETE
+  OPTIONS
+  HEAD
+}
+
+// ==========================================
+// ENTITIES
+// ==========================================
+
+/// System access roles (e.g. USER, ADMIN).
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("roles")
+}
+
+/// Core user account record.
+/// API keys are kept strictly out of this record.
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  firstName    String?   @map("first_name")
+  lastName     String?   @map("last_name")
+  avatarUrl    String?   @map("avatar_url")
+  isActive     Boolean   @default(true) @map("is_active")
+  roleId       String    @map("role_id") @db.Uuid
+  role         Role      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  deletedAt    DateTime? @map("deleted_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  sessions        Session[]
+  subscriptions   Subscription[]
+  userAiProviders UserAIProvider[]
+  conversations   Conversation[]
+  webSearches     WebSearch[]
+  apiUsageLogs    APIUsageLog[]
+
+  @@index([roleId])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+/// User authentication sessions storing hashed refresh tokens.
+model Session {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String   @unique @map("refresh_token_hash")
+  userAgent        String?  @map("user_agent")
+  ipAddress        String?  @map("ip_address")
+  isRevoked        Boolean  @default(false) @map("is_revoked")
+  expiresAt        DateTime @map("expires_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// Available subscription tiers (e.g. FREE, PREMIUM).
+/// Plans can be added or adjusted dynamically without modifying the User model.
+model SubscriptionPlan {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @unique
+  slug         String   @unique
+  description  String?
+  price        Decimal  @default(0.00) @db.Decimal(10, 2)
+  currency     String   @default("USD")
+  billingCycle String   @default("monthly") @map("billing_cycle")
+  features     Json?
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  subscriptions Subscription[]
+
+  @@map("subscription_plans")
+}
+
+/// User subscription records linking a user to a subscription plan.
+model Subscription {
+  id         String             @id @default(uuid()) @db.Uuid
+  userId     String             @map("user_id") @db.Uuid
+  user       User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  planId     String             @map("plan_id") @db.Uuid
+  plan       SubscriptionPlan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+  status     SubscriptionStatus @default(ACTIVE)
+  startDate  DateTime           @default(now()) @map("start_date")
+  endDate    DateTime?          @map("end_date")
+  canceledAt DateTime?          @map("canceled_at")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([status])
+  @@index([planId])
+  @@map("subscriptions")
+}
+
+/// Dynamic AI Provider registry (e.g. OPENAI, CLAUDE, GEMINI).
+/// Supports adding future providers without modifying database structure.
+model AIProvider {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String   @unique
+  description String?
+  baseUrl     String?  @map("base_url")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  userAiProviders UserAIProvider[]
+  conversations   Conversation[]
+
+  @@index([isActive])
+  @@map("ai_providers")
+}
+
+/// Encrypted user-configured AI provider credentials.
+/// Raw API keys must never be stored in plaintext.
+model UserAIProvider {
+  id              String     @id @default(uuid()) @db.Uuid
+  userId          String     @map("user_id") @db.Uuid
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerId      String     @map("provider_id") @db.Uuid
+  provider        AIProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  encryptedApiKey String     @map("encrypted_api_key")
+  keyPreview      String?    @map("key_preview")
+  isEnabled       Boolean    @default(true) @map("is_enabled")
+  isDefault       Boolean    @default(false) @map("is_default")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  @@unique([userId, providerId])
+  @@index([userId])
+  @@index([providerId])
+  @@map("user_ai_providers")
+}
+
+/// Chat conversations belonging to a user.
+model Conversation {
+  id         String      @id @default(uuid()) @db.Uuid
+  userId     String      @map("user_id") @db.Uuid
+  user       User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  providerId String?     @map("provider_id") @db.Uuid
+  provider   AIProvider? @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  title      String      @default("New Conversation")
+  model      String?
+  deletedAt  DateTime?   @map("deleted_at")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+
+  messages Message[]
+
+  @@index([userId])
+  @@index([updatedAt])
+  @@index([providerId])
+  @@index([deletedAt])
+  @@map("conversations")
+}
+
+/// Messages within a conversation.
+model Message {
+  id               String       @id @default(uuid()) @db.Uuid
+  conversationId   String       @map("conversation_id") @db.Uuid
+  conversation     Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role             MessageRole
+  content          String       @db.Text
+  provider         String?
+  model            String?
+  promptTokens     Int?         @map("prompt_tokens")
+  completionTokens Int?         @map("completion_tokens")
+  totalTokens      Int?         @map("total_tokens")
+  metadata         Json?
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+/// Web search queries and structured JSON results for grounding/retrieval.
+model WebSearch {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  query       String   @db.Text
+  provider    String
+  results     Json
+  resultCount Int      @default(0) @map("result_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("web_searches")
+}
+
+/// Audit and analytics log for tracking API endpoint usage, tokens, and response latencies.
+model APIUsageLog {
+  id               String     @id @default(uuid()) @db.Uuid
+  userId           String     @map("user_id") @db.Uuid
+  user             User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  endpoint         String
+  method           HttpMethod
+  provider         String?
+  model            String?
+  promptTokens     Int?       @map("prompt_tokens")
+  completionTokens Int?       @map("completion_tokens")
+  totalTokens      Int?       @map("total_tokens")
+  statusCode       Int        @map("status_code")
+  responseTimeMs   Int        @map("response_time_ms")
+  createdAt        DateTime   @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([provider])
+  @@map("api_usage_logs")
 }
