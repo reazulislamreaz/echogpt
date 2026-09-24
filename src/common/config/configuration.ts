@@ -29,6 +29,7 @@ export default registerAs('app', () => ({
     from: process.env.SMTP_FROM,
     fromName: process.env.SMTP_FROM_NAME ?? 'EchoGPT',
     verificationUrl: process.env.EMAIL_VERIFICATION_URL,
+    mock: (process.env.EMAIL_MOCK ?? 'false') === 'true',
   },
   encryption: {
     key: process.env.ENCRYPTION_KEY,

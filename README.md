@@ -96,8 +96,9 @@ EMAIL_VERIFICATION_URL=http://localhost:3000/api/v1/auth/verify-email
 
 Notes:
 
-- Production requires complete SMTP settings at startup.
-- Development may omit SMTP; registration still succeeds and `POST /auth/resend-verification` can retry later once SMTP is configured.
+- SMTP is optional at startup in every environment. Incomplete or unavailable SMTP does not crash the app.
+- Registration still succeeds if email delivery fails; use `POST /auth/resend-verification` once SMTP is available.
+- Automated e2e tests set `EMAIL_MOCK=true` so they never send real mail.
 - Gmail requires an **App Password** (2-Step Verification), not your normal account password.
 - Verification link format: `EMAIL_VERIFICATION_URL?token=<raw-token>`
 - Endpoints: `GET|POST /api/v1/auth/verify-email`, `POST /api/v1/auth/resend-verification`

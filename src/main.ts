@@ -1,21 +1,9 @@
 import { Logger, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { NextFunction, Request, Response } from 'express';
 import { AppModule } from './app.module';
-
-function applySecurityHeaders(_req: Request, res: Response, next: NextFunction): void {
-  res.setHeader('X-DNS-Prefetch-Control', 'off');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-XSS-Protection', '0');
-  res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  next();
-}
+import { applySecurityHeaders } from './common/bootstrap/security-headers';
+import { setupSwagger } from './common/bootstrap/setup-swagger';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -26,51 +14,21 @@ async function bootstrap(): Promise<void> {
   const apiPrefix = configService.get<string>('app.apiPrefix', 'api');
   const apiVersion = configService.get<string>('app.apiVersion', '1');
   const corsOrigin = configService.get<string>('app.corsOrigin', '*');
-  const swaggerEnabled = configService.get<boolean>('app.swagger.enabled', true);
-  const swaggerPath = configService.get<string>('app.swagger.path', 'docs');
   const nodeEnv = configService.get<string>('app.nodeEnv', 'development');
 
-  // Helmet-compatible security headers (no external helmet dependency required)
   app.use(applySecurityHeaders);
-
   app.setGlobalPrefix(apiPrefix);
   app.enableVersioning({
     type: VersioningType.URI,
     defaultVersion: apiVersion,
   });
-
   app.enableCors({
     origin: corsOrigin === '*' ? true : corsOrigin.split(',').map((origin) => origin.trim()),
     credentials: true,
   });
-
   app.enableShutdownHooks();
 
-  if (swaggerEnabled) {
-    const swaggerConfig = new DocumentBuilder()
-      .setTitle('EchoGPT API')
-      .setDescription('REST API backend for the EchoGPT Chrome Extension')
-      .setVersion('1.0')
-      .addBearerAuth()
-      .addTag('health')
-      .addTag('auth')
-      .addTag('users')
-      .addTag('subscriptions')
-      .addTag('providers')
-      .addTag('chat')
-      .addTag('search')
-      .addTag('admin')
-      .build();
-
-    const document = SwaggerModule.createDocument(app, swaggerConfig);
-    SwaggerModule.setup(`${apiPrefix}/${swaggerPath}`, app, document, {
-      swaggerOptions: {
-        persistAuthorization: true,
-      },
-    });
-
-    logger.log(`Swagger docs available at /${apiPrefix}/${swaggerPath}`);
-  }
+  setupSwagger(app, configService);
 
   await app.listen(port);
   logger.log(`EchoGPT API running on http://localhost:${port}/${apiPrefix}/v${apiVersion}`);

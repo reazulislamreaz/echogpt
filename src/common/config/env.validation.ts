@@ -107,6 +107,10 @@ class EnvironmentVariables {
 
   @IsBooleanString()
   @IsOptional()
+  EMAIL_MOCK: string = 'false';
+
+  @IsBooleanString()
+  @IsOptional()
   SWAGGER_ENABLED: string = 'true';
 
   @IsString()
@@ -193,12 +197,6 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
   if (smtpConfiguredCount > 0 && smtpConfiguredCount < smtpFields.length) {
     throw new Error(
       'Environment validation failed: Email service configuration is incomplete. Set SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM, and EMAIL_VERIFICATION_URL together.',
-    );
-  }
-
-  if (validated.NODE_ENV === NodeEnvironment.Production && smtpConfiguredCount === 0) {
-    throw new Error(
-      'Environment validation failed: Email service configuration is incomplete for production.',
     );
   }
 

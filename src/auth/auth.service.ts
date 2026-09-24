@@ -3,7 +3,7 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
-  ServiceUnavailableException,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -29,6 +29,7 @@ import { generateRandomToken, hashToken, parseDurationToMs } from './utils/token
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly jwtAccessSecret: string;
   private readonly jwtAccessExpiresIn: `${number}${'s' | 'm' | 'h' | 'd'}`;
   private readonly jwtRefreshExpiresIn: string;
@@ -143,23 +144,27 @@ export class AuthService {
       throw error;
     }
 
-    // Dispatch verification email after user creation succeeds.
-    // Delivery failures are logged; the account remains usable via resend-verification.
+    let emailDispatched = false;
     try {
       await this.emailService.sendVerificationEmail(
         normalizedEmail,
         rawVerificationToken,
         newUser.firstName,
       );
+      emailDispatched = true;
     } catch (error) {
-      // Do not roll back registration; user can request a new verification email.
-      if (!(error instanceof ServiceUnavailableException)) {
-        throw error;
-      }
+      // Keep registration successful; token remains valid for resend-verification.
+      this.logger.error(
+        `Verification email dispatch failed after registration for ${normalizedEmail}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
     }
 
     return {
-      message: 'User registered successfully. Please check your email to verify your account.',
+      message: emailDispatched
+        ? 'User registered successfully. Please check your email to verify your account.'
+        : 'User registered successfully. Verification email could not be sent right now. Please use resend-verification.',
       user: this.usersService.toSafeUser(newUser),
     };
   }
@@ -452,9 +457,12 @@ export class AuthService {
     try {
       await this.emailService.sendVerificationEmail(user.email, rawToken, user.firstName);
     } catch (error) {
-      if (!(error instanceof ServiceUnavailableException)) {
-        throw error;
-      }
+      // Generic response avoids enumeration; token remains usable once SMTP recovers.
+      this.logger.error(
+        `Verification email resend failed for ${normalizedEmail}: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`,
+      );
     }
 
     return genericResponse;
