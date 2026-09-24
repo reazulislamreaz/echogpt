@@ -15,6 +15,6 @@ export default registerAs('app', () => ({
     expiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
   },
   database: {
-    url: process.env.DATABASE_URL,
+    url: process.env.DATABASE_URL as string,
   },
 }));

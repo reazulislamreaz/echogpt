@@ -1,6 +1,6 @@
-// Prisma schema for EchoGPT backend.
-// Models will be added in subsequent iterations.
-// Domains: User, Role, Session, Subscription, Provider, Chat, Search, Usage
+// EchoGPT Backend — Prisma schema foundation.
+// Business models (User, Role, Session, Subscription, Provider, Chat, Search, Usage)
+// will be introduced in later steps. Keep this file minimal until then.
 
 generator client {
   provider = "prisma-client-js"

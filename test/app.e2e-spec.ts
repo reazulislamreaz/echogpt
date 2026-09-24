@@ -29,12 +29,17 @@ describe('HealthController (e2e)', () => {
     return request(app.getHttpServer())
       .get('/api/v1/health')
       .expect(200)
-      .expect((res: { body: { status: string; service: string; timestamp: string } }) => {
-        expect(res.body).toMatchObject({
-          status: 'ok',
-          service: 'echogpt-backend',
-        });
-        expect(res.body.timestamp).toBeDefined();
-      });
+      .expect(
+        (res: {
+          body: { status: string; service: string; database: string; timestamp: string };
+        }) => {
+          expect(res.body).toMatchObject({
+            status: 'ok',
+            service: 'echogpt-backend',
+            database: 'up',
+          });
+          expect(res.body.timestamp).toBeDefined();
+        },
+      );
   });
 });

@@ -4,6 +4,7 @@ dist/
 coverage/
 *.tsbuildinfo
 
+.cursor/
 # Environment
 .env
 .env.local

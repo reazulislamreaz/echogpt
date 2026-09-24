@@ -28,6 +28,8 @@ async function bootstrap(): Promise<void> {
     credentials: true,
   });
 
+  app.enableShutdownHooks();
+
   if (swaggerEnabled) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('EchoGPT API')

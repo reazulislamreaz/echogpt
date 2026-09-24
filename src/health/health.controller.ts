@@ -9,8 +9,8 @@ export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Application health check' })
-  check(): HealthCheckResponseDto {
+  @ApiOperation({ summary: 'Application and database health check' })
+  check(): Promise<HealthCheckResponseDto> {
     return this.healthService.check();
   }
 }
