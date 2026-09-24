@@ -20,6 +20,16 @@ export default registerAs('app', () => ({
     bcryptSaltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS ?? '10', 10),
     verificationExpiresHours: parseInt(process.env.EMAIL_VERIFICATION_EXPIRES_HOURS ?? '24', 10),
   },
+  smtp: {
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT ?? '587', 10),
+    secure: (process.env.SMTP_SECURE ?? 'false') === 'true',
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+    from: process.env.SMTP_FROM,
+    fromName: process.env.SMTP_FROM_NAME ?? 'EchoGPT',
+    verificationUrl: process.env.EMAIL_VERIFICATION_URL,
+  },
   encryption: {
     key: process.env.ENCRYPTION_KEY,
   },

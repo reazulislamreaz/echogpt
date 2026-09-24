@@ -77,7 +77,31 @@ src/
 
 ### Auth (`/api/v1/auth`)
 - Register, login, refresh, logout, me
-- Email verification + resend (hashed tokens)
+- Email verification + resend (hashed tokens; SMTP delivery via Nodemailer)
+
+### Email verification (SMTP)
+
+Configure SMTP in `.env` (see `.env.example`):
+
+```bash
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-email@gmail.com
+SMTP_PASS=your-app-password
+SMTP_FROM=your-email@gmail.com
+SMTP_FROM_NAME=EchoGPT
+EMAIL_VERIFICATION_URL=http://localhost:3000/api/v1/auth/verify-email
+```
+
+Notes:
+
+- Production requires complete SMTP settings at startup.
+- Development may omit SMTP; registration still succeeds and `POST /auth/resend-verification` can retry later once SMTP is configured.
+- Gmail requires an **App Password** (2-Step Verification), not your normal account password.
+- Verification link format: `EMAIL_VERIFICATION_URL?token=<raw-token>`
+- Endpoints: `GET|POST /api/v1/auth/verify-email`, `POST /api/v1/auth/resend-verification`
+- Raw tokens are never stored, logged, or returned from APIs.
 
 ### Users (`/api/v1/users`)
 - Self: profile get/update, change password, soft-delete account
@@ -131,7 +155,7 @@ Public probes remain on `GET /api/v1/health`.
 
 - Streaming AI responses: **not implemented** (optional bonus)
 - Search result caching / Redis: **not implemented** (optional bonus)
-- Email delivery is a development logger stub (tokens are hashed and verified correctly)
+- Email delivery requires SMTP env configuration (Nodemailer); without SMTP in development, registration still succeeds and verification can be resent once SMTP is set
 - No payment gateway integration (by design)
 
 ## Subscription & Usage Architecture
