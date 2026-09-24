@@ -12,18 +12,23 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
   ApiBearerAuth,
-  ApiConflictResponse,
   ApiCreatedResponse,
-  ApiForbiddenResponse,
-  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { MessageResponseDto } from '../common/dto/message-response.dto';
+import {
+  ApiStandardBadRequest,
+  ApiStandardConflict,
+  ApiStandardForbidden,
+  ApiStandardNotFound,
+  ApiStandardTooManyRequests,
+  ApiStandardUnauthorized,
+} from '../common/swagger/api-error-responses';
 import { Roles } from '../roles/decorators/roles.decorator';
 import { RoleType } from '../roles/enums/role.enum';
 import { RolesGuard } from '../roles/guards/roles.guard';
@@ -35,7 +40,7 @@ import { UpdateProviderDto } from './dto/update-provider.dto';
 import { ProvidersService } from './providers.service';
 
 @ApiTags('admin')
-@ApiBearerAuth()
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(RoleType.ADMIN)
 @Controller('admin/ai-providers')
@@ -50,9 +55,11 @@ export class AdminProvidersController {
       'Creates a system AI provider. API keys are encrypted at rest and never returned in responses.',
   })
   @ApiCreatedResponse({ type: ProviderResponseDto })
-  @ApiConflictResponse({ description: 'Provider slug already exists' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  @ApiStandardBadRequest()
+  @ApiStandardConflict('Provider slug already exists')
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
   async create(@Body() dto: CreateProviderDto): Promise<ProviderResponseDto> {
     return this.providersService.createProvider(dto);
   }
@@ -61,11 +68,12 @@ export class AdminProvidersController {
   @ApiOperation({
     summary: 'List AI providers (Admin only)',
     description:
-      'Returns all system AI providers including inactive ones. API keys are never exposed.',
+      'Returns all system AI providers including inactive ones. API keys are never exposed (masked preview only when present).',
   })
   @ApiOkResponse({ type: [ProviderResponseDto] })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
   async findAll(): Promise<ProviderResponseDto[]> {
     return this.providersService.listProviders(true);
   }
@@ -73,11 +81,14 @@ export class AdminProvidersController {
   @Get(':id')
   @ApiOperation({
     summary: 'Get AI provider details (Admin only)',
+    description: 'Returns provider metadata. Never includes the raw API key.',
   })
+  @ApiParam({ name: 'id', description: 'AI provider UUID' })
   @ApiOkResponse({ type: ProviderResponseDto })
-  @ApiNotFoundResponse({ description: 'Provider not found' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  @ApiStandardNotFound('Provider not found')
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
   async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<ProviderResponseDto> {
     return this.providersService.getProviderById(id);
   }
@@ -87,10 +98,13 @@ export class AdminProvidersController {
     summary: 'Update AI provider (Admin only)',
     description: 'Updates provider metadata and optionally replaces the encrypted API key.',
   })
+  @ApiParam({ name: 'id', description: 'AI provider UUID' })
   @ApiOkResponse({ type: ProviderResponseDto })
-  @ApiNotFoundResponse({ description: 'Provider not found' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  @ApiStandardBadRequest()
+  @ApiStandardNotFound('Provider not found')
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProviderDto,
@@ -101,12 +115,16 @@ export class AdminProvidersController {
   @Patch(':id/status')
   @ApiOperation({
     summary: 'Enable or disable AI provider (Admin only)',
+    description:
+      'Toggles provider availability. The system default provider cannot be deactivated.',
   })
+  @ApiParam({ name: 'id', description: 'AI provider UUID' })
   @ApiOkResponse({ type: ProviderResponseDto })
-  @ApiBadRequestResponse({ description: 'Cannot deactivate the default provider' })
-  @ApiNotFoundResponse({ description: 'Provider not found' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  @ApiStandardBadRequest('Cannot deactivate the default provider')
+  @ApiStandardNotFound('Provider not found')
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
   async setActive(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetProviderActiveDto,
@@ -120,11 +138,13 @@ export class AdminProvidersController {
     summary: 'Set default AI provider (Admin only)',
     description: 'Clears the previous default and marks this provider as the system default.',
   })
+  @ApiParam({ name: 'id', description: 'AI provider UUID' })
   @ApiOkResponse({ type: ProviderResponseDto })
-  @ApiBadRequestResponse({ description: 'Provider is inactive' })
-  @ApiNotFoundResponse({ description: 'Provider not found' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  @ApiStandardBadRequest('Provider is inactive')
+  @ApiStandardNotFound('Provider not found')
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
   async setDefault(@Param('id', ParseUUIDPipe) id: string): Promise<ProviderResponseDto> {
     return this.providersService.setDefaultProvider(id);
   }
@@ -136,10 +156,12 @@ export class AdminProvidersController {
     description:
       'Performs a lightweight connectivity/credential check. Never returns or logs the API key.',
   })
+  @ApiParam({ name: 'id', description: 'AI provider UUID' })
   @ApiOkResponse({ type: ProviderHealthCheckResponseDto })
-  @ApiNotFoundResponse({ description: 'Provider not found' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  @ApiStandardNotFound('Provider not found')
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
   async healthCheck(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ProviderHealthCheckResponseDto> {
@@ -152,12 +174,14 @@ export class AdminProvidersController {
     summary: 'Delete AI provider (Admin only)',
     description: 'Deletes a non-default provider. Prefer disable for temporary unavailability.',
   })
-  @ApiOkResponse({ description: 'Provider deleted successfully' })
-  @ApiBadRequestResponse({ description: 'Cannot delete the default provider' })
-  @ApiNotFoundResponse({ description: 'Provider not found' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
-  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
+  @ApiParam({ name: 'id', description: 'AI provider UUID' })
+  @ApiOkResponse({ type: MessageResponseDto })
+  @ApiStandardBadRequest('Cannot delete the default provider')
+  @ApiStandardNotFound('Provider not found')
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
+  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<MessageResponseDto> {
     return this.providersService.deleteProvider(id);
   }
 }

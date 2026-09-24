@@ -13,15 +13,25 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiConflictResponse,
-  ApiForbiddenResponse,
-  ApiNotFoundResponse,
+  ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import {
+  AdminSubscriptionDetailDto,
+  PaginatedAdminSubscriptionsDto,
+} from '../admin/dto/admin-subscription-response.dto';
+import {
+  ApiStandardConflict,
+  ApiStandardForbidden,
+  ApiStandardNotFound,
+  ApiStandardTooManyRequests,
+  ApiStandardUnauthorized,
+  ApiStandardBadRequest,
+} from '../common/swagger/api-error-responses';
 import { Roles } from '../roles/decorators/roles.decorator';
 import { RoleType } from '../roles/enums/role.enum';
 import { RolesGuard } from '../roles/guards/roles.guard';
@@ -33,7 +43,7 @@ import { SubscriptionResponseDto } from './dto/subscription-response.dto';
 import { SubscriptionsService } from './subscriptions.service';
 
 @ApiTags('admin')
-@ApiBearerAuth()
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(RoleType.ADMIN)
 @Controller('admin')
@@ -43,15 +53,12 @@ export class AdminSubscriptionsController {
   @Get('subscription-plans')
   @ApiOperation({
     summary: 'List all subscription plans (Admin only)',
-    description:
-      'Retrieves all subscription plans, including inactive tiers, with full configuration.',
+    description: 'Retrieves all subscription plans, including inactive tiers.',
   })
-  @ApiOkResponse({
-    description: 'List of all subscription plans',
-    type: [PlanResponseDto],
-  })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  @ApiOkResponse({ type: [PlanResponseDto] })
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
   async getPlans(): Promise<PlanResponseDto[]> {
     return this.subscriptionsService.getAllPlans();
   }
@@ -60,15 +67,14 @@ export class AdminSubscriptionsController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Create a new subscription plan (Admin only)',
-    description: 'Creates a new subscription plan with name, slug, price, and request limits.',
+    description: 'Creates a subscription plan with name, slug, price, and request limits.',
   })
-  @ApiOkResponse({
-    description: 'Plan created successfully',
-    type: PlanResponseDto,
-  })
-  @ApiConflictResponse({ description: 'Plan name or slug already in use' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  @ApiCreatedResponse({ type: PlanResponseDto })
+  @ApiStandardBadRequest()
+  @ApiStandardConflict('Plan name or slug already in use')
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
   async createPlan(@Body() dto: AdminCreatePlanDto): Promise<PlanResponseDto> {
     return this.subscriptionsService.adminCreatePlan(dto);
   }
@@ -77,15 +83,15 @@ export class AdminSubscriptionsController {
   @ApiOperation({
     summary: 'Update subscription plan configuration (Admin only)',
     description:
-      'Modifies plan properties like request limits, prices, and active state without corrupting user subscriptions.',
+      'Modifies plan properties such as request limits, prices, and active state without corrupting existing subscriptions.',
   })
-  @ApiOkResponse({
-    description: 'Plan updated successfully',
-    type: PlanResponseDto,
-  })
-  @ApiNotFoundResponse({ description: 'Subscription plan not found' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  @ApiParam({ name: 'id', description: 'Subscription plan UUID' })
+  @ApiOkResponse({ type: PlanResponseDto })
+  @ApiStandardBadRequest()
+  @ApiStandardNotFound('Subscription plan not found')
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
   async updatePlan(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AdminUpdatePlanDto,
@@ -99,12 +105,13 @@ export class AdminSubscriptionsController {
     description:
       'Retrieves user subscriptions with optional filters by status, planId, and userId.',
   })
-  @ApiOkResponse({
-    description: 'Paginated user subscriptions list',
-  })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
-  async getSubscriptions(@Query() query: AdminSubscriptionQueryDto) {
+  @ApiOkResponse({ type: PaginatedAdminSubscriptionsDto })
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
+  async getSubscriptions(
+    @Query() query: AdminSubscriptionQueryDto,
+  ): Promise<PaginatedAdminSubscriptionsDto> {
     return this.subscriptionsService.adminGetSubscriptions(query.page, query.limit, {
       status: query.status,
       planId: query.planId,
@@ -117,11 +124,15 @@ export class AdminSubscriptionsController {
     summary: 'Get subscription details (Admin only)',
     description: 'Returns a subscription with plan and safe user summary.',
   })
-  @ApiOkResponse({ description: 'Subscription details' })
-  @ApiNotFoundResponse({ description: 'Subscription not found' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
-  async getSubscription(@Param('id', ParseUUIDPipe) id: string) {
+  @ApiParam({ name: 'id', description: 'Subscription UUID' })
+  @ApiOkResponse({ type: AdminSubscriptionDetailDto })
+  @ApiStandardNotFound('Subscription not found')
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
+  async getSubscription(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<AdminSubscriptionDetailDto> {
     return this.subscriptionsService.adminGetSubscriptionById(id);
   }
 
@@ -130,13 +141,13 @@ export class AdminSubscriptionsController {
     summary: 'Update subscription status (Admin only)',
     description: 'Changes lifecycle status of a subscription (e.g. PAST_DUE, EXPIRED, CANCELED).',
   })
-  @ApiOkResponse({
-    description: 'Subscription status updated successfully',
-    type: SubscriptionResponseDto,
-  })
-  @ApiNotFoundResponse({ description: 'Subscription not found' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
+  @ApiParam({ name: 'id', description: 'Subscription UUID' })
+  @ApiOkResponse({ type: SubscriptionResponseDto })
+  @ApiStandardBadRequest()
+  @ApiStandardNotFound('Subscription not found')
+  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('ADMIN role required')
+  @ApiStandardTooManyRequests()
   async updateSubscriptionStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AdminUpdateSubscriptionStatusDto,

@@ -7,6 +7,7 @@ export class PaginationQueryDto {
     example: 1,
     description: 'Page number for pagination (1-indexed)',
     default: 1,
+    minimum: 1,
   })
   @IsOptional()
   @Type(() => Number)
@@ -16,8 +17,10 @@ export class PaginationQueryDto {
 
   @ApiPropertyOptional({
     example: 20,
-    description: 'Number of items per page',
+    description: 'Number of items per page (max 100)',
     default: 20,
+    minimum: 1,
+    maximum: 100,
   })
   @IsOptional()
   @Type(() => Number)

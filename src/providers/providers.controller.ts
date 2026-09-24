@@ -11,26 +11,25 @@ import {
   Put,
   UseGuards,
 } from '@nestjs/common';
-import {
-  ApiBadRequestResponse,
-  ApiBearerAuth,
-  ApiForbiddenResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-  ApiUnauthorizedResponse,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { MessageResponseDto } from '../common/dto/message-response.dto';
+import {
+  ApiStandardBadRequest,
+  ApiStandardForbidden,
+  ApiStandardNotFound,
+  ApiStandardTooManyRequests,
+  ApiStandardUnauthorized,
+} from '../common/swagger/api-error-responses';
 import { ProviderResponseDto } from './dto/provider-response.dto';
 import { UpsertUserProviderDto } from './dto/upsert-user-provider.dto';
 import { UserProviderResponseDto } from './dto/user-provider-response.dto';
 import { ProvidersService } from './providers.service';
 
 @ApiTags('providers')
-@ApiBearerAuth()
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
 @Controller('providers')
 export class ProvidersController {
@@ -43,7 +42,8 @@ export class ProvidersController {
       'Returns active system providers available for selection. System API keys are never exposed.',
   })
   @ApiOkResponse({ type: [ProviderResponseDto] })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async listActive(): Promise<ProviderResponseDto[]> {
     return this.providersService.listActiveProvidersForUsers();
   }
@@ -51,10 +51,12 @@ export class ProvidersController {
   @Get('me')
   @ApiOperation({
     summary: 'List current user AI provider configurations',
-    description: 'Returns the authenticated user provider credentials metadata (never raw keys).',
+    description:
+      'Returns the authenticated user provider credential metadata (masked key preview only; never raw keys).',
   })
   @ApiOkResponse({ type: [UserProviderResponseDto] })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async listMine(@CurrentUser() user: AuthenticatedUser): Promise<UserProviderResponseDto[]> {
     return this.providersService.listUserProviders(user.id);
   }
@@ -65,10 +67,12 @@ export class ProvidersController {
     description:
       'Stores an optional encrypted user API key and enable/default flags for a system provider.',
   })
+  @ApiParam({ name: 'providerId', description: 'System AI provider UUID' })
   @ApiOkResponse({ type: UserProviderResponseDto })
-  @ApiBadRequestResponse({ description: 'Inactive provider or invalid configuration' })
-  @ApiNotFoundResponse({ description: 'System provider not found' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardBadRequest('Inactive provider or invalid configuration')
+  @ApiStandardNotFound('System provider not found')
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async upsertMine(
     @CurrentUser() user: AuthenticatedUser,
     @Param('providerId', ParseUUIDPipe) providerId: string,
@@ -81,11 +85,14 @@ export class ProvidersController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Set user default AI provider',
+    description: 'Marks the given user provider configuration as the user default.',
   })
+  @ApiParam({ name: 'providerId', description: 'System AI provider UUID' })
   @ApiOkResponse({ type: UserProviderResponseDto })
-  @ApiBadRequestResponse({ description: 'Provider disabled or inactive' })
-  @ApiNotFoundResponse({ description: 'User provider configuration not found' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardBadRequest('Provider disabled or inactive')
+  @ApiStandardNotFound('User provider configuration not found')
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async setDefault(
     @CurrentUser() user: AuthenticatedUser,
     @Param('providerId', ParseUUIDPipe) providerId: string,
@@ -97,15 +104,18 @@ export class ProvidersController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Delete user AI provider configuration',
+    description: 'Removes the authenticated user configuration for the given system provider.',
   })
-  @ApiOkResponse({ description: 'Configuration deleted' })
-  @ApiNotFoundResponse({ description: 'User provider configuration not found' })
-  @ApiForbiddenResponse({ description: 'Ownership violation' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiParam({ name: 'providerId', description: 'System AI provider UUID' })
+  @ApiOkResponse({ type: MessageResponseDto })
+  @ApiStandardNotFound('User provider configuration not found')
+  @ApiStandardForbidden('Ownership violation')
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async removeMine(
     @CurrentUser() user: AuthenticatedUser,
     @Param('providerId', ParseUUIDPipe) providerId: string,
-  ): Promise<{ message: string }> {
+  ): Promise<MessageResponseDto> {
     return this.providersService.deleteUserProvider(user.id, providerId);
   }
 }

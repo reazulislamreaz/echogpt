@@ -29,7 +29,9 @@ npm run start:dev
 
 - API base: `http://localhost:3000/api/v1`
 - Health: `GET /api/v1/health`
-- Swagger: `http://localhost:3000/api/docs`
+- **API Documentation (Swagger):** `http://localhost:3000/api/docs`
+
+Interactive OpenAPI docs with request/response schemas, JWT **Authorize**, and try-it-out against the running API.
 
 ### Seeded demo admin
 

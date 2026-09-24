@@ -4,10 +4,12 @@ import {
   ApiOperation,
   ApiServiceUnavailableResponse,
   ApiTags,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { Response } from 'express';
-import { HealthService } from './health.service';
+import { ApiErrorResponseDto } from '../common/dto/api-error-response.dto';
 import { HealthCheckResponseDto } from './dto/health-check-response.dto';
+import { HealthService } from './health.service';
 
 @ApiTags('health')
 @Controller({ path: 'health', version: '1' })
@@ -19,15 +21,19 @@ export class HealthController {
   @ApiOperation({
     summary: 'Application health check',
     description:
-      'Database is critical (503 when down). Redis/SMTP are informational optional dependencies.',
+      'Reports application health. Database is critical (HTTP 503 when down). Redis and SMTP are informational optional dependencies and do not fail the overall status when unavailable.',
   })
   @ApiOkResponse({
     description: 'Service healthy (database up)',
     type: HealthCheckResponseDto,
   })
   @ApiServiceUnavailableResponse({
-    description: 'Database unavailable',
+    description: 'Database unavailable — body still uses the health check schema',
     type: HealthCheckResponseDto,
+  })
+  @ApiTooManyRequestsResponse({
+    description: 'HTTP rate limit exceeded',
+    type: ApiErrorResponseDto,
   })
   async check(@Res({ passthrough: true }) res: Response): Promise<HealthCheckResponseDto> {
     const result = await this.healthService.check();

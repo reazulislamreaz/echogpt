@@ -1,17 +1,15 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
-import {
-  ApiBadRequestResponse,
-  ApiBearerAuth,
-  ApiConflictResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
-  ApiOperation,
-  ApiTags,
-  ApiUnauthorizedResponse,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import {
+  ApiStandardBadRequest,
+  ApiStandardConflict,
+  ApiStandardNotFound,
+  ApiStandardTooManyRequests,
+  ApiStandardUnauthorized,
+} from '../common/swagger/api-error-responses';
 import { DowngradeSubscriptionDto } from './dto/downgrade-subscription.dto';
 import { PlanResponseDto } from './dto/plan-response.dto';
 import { SubscriptionResponseDto } from './dto/subscription-response.dto';
@@ -28,29 +26,25 @@ export class SubscriptionsController {
   @ApiOperation({
     summary: 'List active subscription plans',
     description:
-      'Returns a list of all publicly available, active subscription tiers with their prices and request limits.',
+      'Returns publicly available active subscription tiers with prices and request limits. `requestLimit: null` means unlimited.',
   })
-  @ApiOkResponse({
-    description: 'Active subscription plans list',
-    type: [PlanResponseDto],
-  })
+  @ApiOkResponse({ type: [PlanResponseDto] })
+  @ApiStandardTooManyRequests()
   async getPlans(): Promise<PlanResponseDto[]> {
     return this.subscriptionsService.getActivePlans();
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('bearer')
   @ApiOperation({
     summary: 'Get current user subscription',
     description:
-      'Retrieves the authenticated user active subscription record, plan details, and current billing cycle window.',
+      'Returns the authenticated user active subscription, plan details, and current billing cycle window.',
   })
-  @ApiOkResponse({
-    description: 'Current user subscription',
-    type: SubscriptionResponseDto,
-  })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiOkResponse({ type: SubscriptionResponseDto })
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async getMySubscription(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<SubscriptionResponseDto> {
@@ -60,38 +54,34 @@ export class SubscriptionsController {
 
   @Get('status')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('bearer')
   @ApiOperation({
     summary: 'Get subscription usage and remaining requests',
     description:
-      'Dynamically calculates request usage within the active billing cycle and reports remaining requests before quota exhaustion.',
+      'Calculates successful request usage within the active billing cycle and reports remaining quota. `remainingRequests` is null when unlimited.',
   })
-  @ApiOkResponse({
-    description: 'Subscription status and dynamic usage quota',
-    type: SubscriptionStatusResponseDto,
-  })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiOkResponse({ type: SubscriptionStatusResponseDto })
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async getStatus(@CurrentUser() user: AuthenticatedUser): Promise<SubscriptionStatusResponseDto> {
     return this.subscriptionsService.getSubscriptionStatus(user.id);
   }
 
   @Post('upgrade')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('bearer')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Upgrade subscription plan',
     description:
-      'Transitions the authenticated user to a higher tier plan in a transaction, setting a new active billing period.',
+      'Transitions the authenticated user to a higher-tier plan in a transaction and starts a new billing period.',
   })
-  @ApiOkResponse({
-    description: 'Subscription upgraded successfully',
-    type: SubscriptionResponseDto,
-  })
-  @ApiBadRequestResponse({ description: 'Invalid plan slug' })
-  @ApiNotFoundResponse({ description: 'Target plan does not exist or is inactive' })
-  @ApiConflictResponse({ description: 'User already actively subscribed to this plan' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiOkResponse({ type: SubscriptionResponseDto })
+  @ApiStandardBadRequest('Invalid plan slug or upgrade not allowed')
+  @ApiStandardNotFound('Target plan does not exist or is inactive')
+  @ApiStandardConflict('User already actively subscribed to this plan')
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async upgrade(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpgradeSubscriptionDto,
@@ -101,23 +91,19 @@ export class SubscriptionsController {
 
   @Post('downgrade')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('bearer')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Downgrade subscription plan',
     description:
-      'Schedules a subscription downgrade at the end of the current billing cycle, preserving entitlements until cycle expiration.',
+      'Schedules a subscription downgrade at the end of the current billing cycle, preserving entitlements until expiration.',
   })
-  @ApiOkResponse({
-    description: 'Subscription downgrade scheduled successfully',
-    type: SubscriptionResponseDto,
-  })
-  @ApiBadRequestResponse({ description: 'User is already on this plan' })
-  @ApiConflictResponse({
-    description: 'Subscription is already scheduled for downgrade',
-  })
-  @ApiNotFoundResponse({ description: 'Target plan does not exist or is inactive' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiOkResponse({ type: SubscriptionResponseDto })
+  @ApiStandardBadRequest('User is already on this plan')
+  @ApiStandardConflict('Subscription is already scheduled for downgrade')
+  @ApiStandardNotFound('Target plan does not exist or is inactive')
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async downgrade(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: DowngradeSubscriptionDto,

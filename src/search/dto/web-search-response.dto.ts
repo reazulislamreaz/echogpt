@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { PaginationMetaDto } from '../../common/dto/pagination-meta.dto';
 
 export class SearchResultItemDto {
   @ApiProperty({ example: 'NestJS Documentation' })
@@ -63,13 +64,6 @@ export class PaginatedWebSearchHistoryDto {
   @ApiProperty({ type: [WebSearchResponseDto] })
   items!: WebSearchResponseDto[];
 
-  @ApiProperty({
-    example: { page: 1, limit: 20, total: 42, totalPages: 3 },
-  })
-  meta!: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
 }

@@ -1,5 +1,33 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaginationMetaDto } from '../../common/dto/pagination-meta.dto';
 import { UserResponseDto } from '../../users/dto/user-response.dto';
+
+export class AdminUserActiveSubscriptionSummaryDto {
+  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000' })
+  id!: string;
+
+  @ApiProperty({ example: 'ACTIVE' })
+  status!: string;
+
+  @ApiProperty({ example: 'Free' })
+  planName!: string;
+
+  @ApiProperty({ example: 'free' })
+  planSlug!: string;
+
+  @ApiPropertyOptional({
+    example: 100,
+    nullable: true,
+    description: 'Null means unlimited requests for the plan',
+  })
+  requestLimit!: number | null;
+
+  @ApiProperty()
+  currentPeriodStart!: Date;
+
+  @ApiProperty()
+  currentPeriodEnd!: Date;
+}
 
 export class AdminUserDetailDto extends UserResponseDto {
   @ApiPropertyOptional({ nullable: true })
@@ -8,16 +36,9 @@ export class AdminUserDetailDto extends UserResponseDto {
   @ApiPropertyOptional({
     description: 'Active subscription summary when present',
     nullable: true,
+    type: AdminUserActiveSubscriptionSummaryDto,
   })
-  activeSubscription!: {
-    id: string;
-    status: string;
-    planName: string;
-    planSlug: string;
-    requestLimit: number | null;
-    currentPeriodStart: Date;
-    currentPeriodEnd: Date;
-  } | null;
+  activeSubscription!: AdminUserActiveSubscriptionSummaryDto | null;
 }
 
 export class AdminUserUsageSummaryDto {
@@ -68,13 +89,6 @@ export class PaginatedAdminUsersDto {
   @ApiProperty({ type: [UserResponseDto] })
   items!: UserResponseDto[];
 
-  @ApiProperty({
-    example: { page: 1, limit: 20, total: 100, totalPages: 5 },
-  })
-  meta!: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
 }
