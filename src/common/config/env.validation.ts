@@ -41,12 +41,35 @@ class EnvironmentVariables {
   DATABASE_URL!: string;
 
   @IsString()
-  @IsNotEmpty()
-  JWT_SECRET!: string;
+  @IsOptional()
+  JWT_SECRET?: string;
 
   @IsString()
   @IsOptional()
-  JWT_EXPIRES_IN: string = '1d';
+  JWT_ACCESS_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  JWT_ACCESS_EXPIRES_IN: string = '15m';
+
+  @IsString()
+  @IsOptional()
+  JWT_REFRESH_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  JWT_REFRESH_EXPIRES_IN: string = '7d';
+
+  @IsInt()
+  @Min(4)
+  @Max(31)
+  @IsOptional()
+  BCRYPT_SALT_ROUNDS: number = 10;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  EMAIL_VERIFICATION_EXPIRES_HOURS: number = 24;
 
   @IsBooleanString()
   @IsOptional()
@@ -75,6 +98,12 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
       .map((error) => Object.values(error.constraints ?? {}).join(', '))
       .join('; ');
     throw new Error(`Environment validation failed: ${messages}`);
+  }
+
+  if (!validated.JWT_ACCESS_SECRET && !validated.JWT_SECRET) {
+    throw new Error(
+      'Environment validation failed: Either JWT_ACCESS_SECRET or JWT_SECRET must be configured',
+    );
   }
 
   return validated;
