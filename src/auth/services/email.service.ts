@@ -17,15 +17,18 @@ export class EmailService implements EmailProvider {
 
   /**
    * Sends an email verification link containing the raw token.
-   * In development/test, logs an informational message without exposing raw secrets in production.
+   * Development logs confirm dispatch without printing the raw token.
+   * Production should integrate a real SMTP / transactional email provider.
    */
   async sendVerificationEmail(to: string, token: string): Promise<void> {
+    // Keep the token parameter for future provider payloads; never log it.
+    void token;
+
     if (this.isProduction) {
-      // In production, delegate to configured SMTP / transactional email provider (e.g. Resend, SendGrid)
       this.logger.log(`Verification email dispatched to recipient: ${to}`);
     } else {
       this.logger.debug(
-        `[DEV/TEST] Email verification requested for ${to}. Verification token: ${token}`,
+        `[DEV/TEST] Email verification requested for ${to}. Token issued (value not logged).`,
       );
     }
     await Promise.resolve();
