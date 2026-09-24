@@ -38,6 +38,7 @@ async function main(): Promise<void> {
       price: 0.0,
       currency: 'USD',
       billingCycle: 'monthly',
+      requestLimit: 50,
       features: {
         maxRequestsPerDay: 50,
         webSearchEnabled: true,
@@ -48,10 +49,11 @@ async function main(): Promise<void> {
     {
       name: 'PREMIUM',
       slug: 'premium',
-      description: 'Premium tier with unlimited access and priority routing',
+      description: 'Premium tier with expanded access and priority routing',
       price: 20.0,
       currency: 'USD',
       billingCycle: 'monthly',
+      requestLimit: 2000,
       features: {
         maxRequestsPerDay: 2000,
         webSearchEnabled: true,
@@ -70,6 +72,7 @@ async function main(): Promise<void> {
         price: plan.price,
         currency: plan.currency,
         billingCycle: plan.billingCycle,
+        requestLimit: plan.requestLimit,
         features: plan.features,
         isActive: plan.isActive,
       },
@@ -80,6 +83,7 @@ async function main(): Promise<void> {
         price: plan.price,
         currency: plan.currency,
         billingCycle: plan.billingCycle,
+        requestLimit: plan.requestLimit,
         features: plan.features,
         isActive: plan.isActive,
       },
@@ -88,6 +92,9 @@ async function main(): Promise<void> {
   }
 
   // 3. AI Providers
+  // Note: encryptedApiKey is intentionally omitted — real keys are configured by admins at runtime.
+  // The first provider (OpenAI) is set as the system-wide default.
+  // The partial unique index "ai_providers_one_default_idx" enforces at most one default.
   const aiProviders = [
     {
       name: 'OpenAI',
@@ -95,6 +102,7 @@ async function main(): Promise<void> {
       description: 'OpenAI models (e.g. GPT-4o, GPT-4o-mini)',
       baseUrl: 'https://api.openai.com/v1',
       isActive: true,
+      isDefault: true,
     },
     {
       name: 'Anthropic Claude',
@@ -102,6 +110,7 @@ async function main(): Promise<void> {
       description: 'Anthropic Claude models (e.g. Claude 3.5 Sonnet, Claude 3 Haiku)',
       baseUrl: 'https://api.anthropic.com/v1',
       isActive: true,
+      isDefault: false,
     },
     {
       name: 'Google Gemini',
@@ -109,6 +118,7 @@ async function main(): Promise<void> {
       description: 'Google Gemini models (e.g. Gemini 1.5 Pro, Gemini 1.5 Flash)',
       baseUrl: 'https://generativelanguage.googleapis.com',
       isActive: true,
+      isDefault: false,
     },
   ];
 
@@ -120,6 +130,7 @@ async function main(): Promise<void> {
         description: provider.description,
         baseUrl: provider.baseUrl,
         isActive: provider.isActive,
+        isDefault: provider.isDefault,
       },
       create: {
         name: provider.name,
@@ -127,9 +138,12 @@ async function main(): Promise<void> {
         description: provider.description,
         baseUrl: provider.baseUrl,
         isActive: provider.isActive,
+        isDefault: provider.isDefault,
       },
     });
-    console.log(`✓ AI Provider seeded: ${createdProvider.name} [${createdProvider.slug}]`);
+    console.log(
+      `✓ AI Provider seeded: ${createdProvider.name} [${createdProvider.slug}]${createdProvider.isDefault ? ' (DEFAULT)' : ''}`,
+    );
   }
 
   console.log('Seeding completed successfully.');
