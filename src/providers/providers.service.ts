@@ -45,6 +45,11 @@ export class ProvidersService {
     const encryptedApiKey = dto.apiKey ? encryptSecret(dto.apiKey, this.encryptionKey) : null;
     const keyPreview = dto.apiKey ? buildKeyPreview(dto.apiKey) : null;
     const makeDefault = dto.isDefault === true;
+    const isActive = dto.isActive ?? true;
+
+    if (makeDefault && !isActive) {
+      throw new BadRequestException('Cannot set an inactive provider as default');
+    }
 
     try {
       const created = await this.prisma.$transaction(async (tx) => {
@@ -62,7 +67,7 @@ export class ProvidersService {
             description: dto.description?.trim() || null,
             baseUrl: dto.baseUrl?.trim() || null,
             encryptedApiKey,
-            isActive: dto.isActive ?? true,
+            isActive,
             isDefault: makeDefault,
           },
         });
@@ -92,7 +97,13 @@ export class ProvidersService {
   }
 
   async updateProvider(id: string, dto: UpdateProviderDto): Promise<ProviderResponseDto> {
-    await this.findProviderOrThrow(id);
+    const provider = await this.findProviderOrThrow(id);
+
+    if (dto.isActive === false && provider.isDefault) {
+      throw new BadRequestException(
+        'Cannot deactivate the default provider. Set another default provider first.',
+      );
+    }
 
     const data: Prisma.AIProviderUpdateInput = {};
     let keyPreview: string | null | undefined;
