@@ -14,6 +14,7 @@ describe('AuthService', () => {
   let authService: AuthService;
   let prismaService: any;
   let usersService: any;
+  let emailService: { sendVerificationEmail: jest.Mock };
 
   const mockUserRole = {
     id: 'role-user-id',
@@ -147,6 +148,7 @@ describe('AuthService', () => {
     authService = module.get<AuthService>(AuthService);
     prismaService = module.get(PrismaService);
     usersService = module.get(UsersService);
+    emailService = module.get(EmailService);
   });
 
   describe('Registration', () => {
@@ -184,6 +186,31 @@ describe('AuthService', () => {
           }),
         }),
       );
+      expect(result.message).toContain('Please check your email');
+    });
+
+    it('should still register when verification email dispatch fails', async () => {
+      prismaService.user.findUnique.mockResolvedValue(null);
+      prismaService.user.create.mockResolvedValue(mockUser);
+      prismaService.emailVerificationToken.create.mockResolvedValue({
+        id: 'token-id',
+        userId: mockUser.id,
+        tokenHash: 'hashed',
+        expiresAt: new Date(),
+        usedAt: null,
+        createdAt: new Date(),
+      });
+      emailService.sendVerificationEmail.mockRejectedValueOnce(new Error('SMTP unavailable'));
+
+      const result = await authService.register({
+        email: 'smtp-fail@example.com',
+        password: 'StrongPassword123!',
+        firstName: 'Test',
+      });
+
+      expect(result.user.email).toBe('test@example.com');
+      expect(result.message).toContain('resend-verification');
+      expect(result.message).not.toContain('Please check your email');
     });
 
     it('should reject registration if email is already registered', async () => {

@@ -87,6 +87,28 @@ describe('EmailService', () => {
     ).rejects.toThrow(ServiceUnavailableException);
   });
 
+  it('skips sending when EMAIL_MOCK is enabled', async () => {
+    const service = await createService({
+      'app.smtp.mock': true,
+    });
+
+    await expect(
+      service.sendVerificationEmail('new@example.com', 'raw-token-value'),
+    ).resolves.toBeUndefined();
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
+  it('skips sending in test env even when SMTP is configured', async () => {
+    const service = await createService({
+      'app.nodeEnv': 'test',
+    });
+
+    await expect(
+      service.sendVerificationEmail('new@example.com', 'raw-token-value'),
+    ).resolves.toBeUndefined();
+    expect(sendMail).not.toHaveBeenCalled();
+  });
+
   it('throws when SMTP configuration is incomplete outside test env', async () => {
     const service = await createService({
       'app.smtp.host': undefined,

@@ -3,12 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 
-export interface SendVerificationEmailParams {
-  to: string;
-  firstName?: string | null;
-  rawToken: string;
-}
-
 @Injectable()
 export class EmailService implements OnModuleDestroy {
   private readonly logger = new Logger(EmailService.name);
@@ -40,18 +34,14 @@ export class EmailService implements OnModuleDestroy {
         host,
         port,
         secure,
-        auth: {
-          user,
-          pass,
-        },
+        auth: { user, pass },
+        connectionTimeout: 10_000,
+        greetingTimeout: 10_000,
+        socketTimeout: 20_000,
       });
-    } else if (this.nodeEnv === 'production') {
-      this.logger.error(
-        'Email service configuration is incomplete. SMTP delivery will fail until SMTP_* and EMAIL_VERIFICATION_URL are set.',
-      );
     } else {
       this.logger.warn(
-        'SMTP is not configured. Verification emails will not be delivered until SMTP settings are provided.',
+        'SMTP is not configured. Verification emails will fail until SMTP_* and EMAIL_VERIFICATION_URL are set.',
       );
     }
   }
@@ -61,10 +51,10 @@ export class EmailService implements OnModuleDestroy {
     this.transporter = null;
   }
 
-  /**
-   * Verifies SMTP connectivity/auth without sending a message.
-   * Throws a safe error when SMTP is not configured or verification fails.
-   */
+  isSmtpConfigured(): boolean {
+    return this.smtpConfigured;
+  }
+
   async verifySmtpConnection(): Promise<{ ok: boolean; message: string }> {
     if (!this.transporter || !this.smtpConfigured) {
       throw new ServiceUnavailableException('Email service configuration is incomplete.');
@@ -81,30 +71,22 @@ export class EmailService implements OnModuleDestroy {
     }
   }
 
-  isSmtpConfigured(): boolean {
-    return this.smtpConfigured;
-  }
-
   /**
-   * Sends a verification email containing a one-time link.
-   * The raw token is used only to build the URL and is never logged.
+   * Sends a verification email. The raw token is used only to build the URL and is never logged.
    */
   async sendVerificationEmail(
     to: string,
     rawToken: string,
     firstName?: string | null,
   ): Promise<void> {
-    if (!this.smtpConfigured || !this.transporter) {
-      if (this.nodeEnv === 'test') {
-        this.logger.debug(
-          `[TEST] Verification email skipped (SMTP not configured) for recipient: ${to}`,
-        );
-        return;
-      }
+    const emailMock = this.configService.get<boolean>('app.smtp.mock', false);
+    if (this.nodeEnv === 'test' || emailMock) {
+      this.logger.debug(`[TEST] Verification email skipped for recipient: ${to}`);
+      return;
+    }
 
-      this.logger.error(
-        `Cannot send verification email to ${to}: Email service configuration is incomplete.`,
-      );
+    if (!this.smtpConfigured || !this.transporter) {
+      this.logger.error(`Cannot send verification email to ${to}: SMTP is not configured.`);
       throw new ServiceUnavailableException('Email service configuration is incomplete.');
     }
 
@@ -114,17 +96,13 @@ export class EmailService implements OnModuleDestroy {
     const verificationUrl = this.buildVerificationUrl(verificationBaseUrl, rawToken);
     const displayName = firstName?.trim() || 'there';
 
-    const subject = 'Verify your EchoGPT account';
-    const text = this.buildPlainTextEmail(displayName, verificationUrl);
-    const html = this.buildHtmlEmail(displayName, verificationUrl);
-
     try {
       await this.transporter.sendMail({
         from: `"${fromName}" <${fromAddress}>`,
         to,
-        subject,
-        text,
-        html,
+        subject: 'Verify your EchoGPT account',
+        text: this.buildPlainTextEmail(displayName, verificationUrl),
+        html: this.buildHtmlEmail(displayName, verificationUrl),
       });
       this.logger.log(`Verification email dispatched to recipient: ${to}`);
     } catch (error) {
@@ -165,50 +143,26 @@ export class EmailService implements OnModuleDestroy {
 
     return `<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Verify your EchoGPT account</title>
-</head>
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Verify your EchoGPT account</title></head>
 <body style="margin:0;padding:0;background:#f4f6f8;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f6f8;padding:32px 12px;">
-    <tr>
-      <td align="center">
-        <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e5e7eb;">
-          <tr>
-            <td>
-              <h1 style="margin:0 0 16px;font-size:22px;color:#111827;">EchoGPT</h1>
-              <p style="margin:0 0 12px;font-size:16px;">Hello ${safeName},</p>
-              <p style="margin:0 0 12px;font-size:15px;line-height:1.5;">
-                Welcome to EchoGPT. Your account was created successfully.
-                Please verify your email address to continue.
-              </p>
-              <p style="margin:24px 0;" align="center">
-                <a href="${safeUrl}" style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">
-                  Verify Email
-                </a>
-              </p>
-              <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:#4b5563;">
-                If the button does not work, copy and paste this URL into your browser:
-              </p>
-              <p style="margin:0 0 16px;font-size:13px;word-break:break-all;color:#2563eb;">
-                ${safeUrl}
-              </p>
-              <p style="margin:0 0 12px;font-size:13px;color:#6b7280;">
-                This verification link will expire in ${this.verificationExpiresHours} hour(s).
-              </p>
-              <p style="margin:0;font-size:13px;color:#6b7280;">
-                If you did not create this account, you can safely ignore this email.
-              </p>
-              <p style="margin:24px 0 0;font-size:14px;">
-                Regards,<br />
-                EchoGPT Team
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
+    <tr><td align="center">
+      <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e5e7eb;">
+        <tr><td>
+          <h1 style="margin:0 0 16px;font-size:22px;color:#111827;">EchoGPT</h1>
+          <p style="margin:0 0 12px;font-size:16px;">Hello ${safeName},</p>
+          <p style="margin:0 0 12px;font-size:15px;line-height:1.5;">Welcome to EchoGPT. Please verify your email address to continue.</p>
+          <p style="margin:24px 0;" align="center">
+            <a href="${safeUrl}" style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;padding:12px 20px;border-radius:8px;font-weight:600;">Verify Email</a>
+          </p>
+          <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:#4b5563;">If the button does not work, copy and paste this URL into your browser:</p>
+          <p style="margin:0 0 16px;font-size:13px;word-break:break-all;color:#2563eb;">${safeUrl}</p>
+          <p style="margin:0 0 12px;font-size:13px;color:#6b7280;">This verification link will expire in ${this.verificationExpiresHours} hour(s).</p>
+          <p style="margin:0;font-size:13px;color:#6b7280;">If you did not create this account, you can safely ignore this email.</p>
+          <p style="margin:24px 0 0;font-size:14px;">Regards,<br />EchoGPT Team</p>
+        </td></tr>
+      </table>
+    </td></tr>
   </table>
 </body>
 </html>`;
