@@ -13,23 +13,27 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
-  ApiForbiddenResponse,
-  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
-  ApiServiceUnavailableResponse,
+  ApiParam,
   ApiTags,
-  ApiTooManyRequestsResponse,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Request } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
+import { MessageResponseDto } from '../common/dto/message-response.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import {
+  ApiStandardBadRequest,
+  ApiStandardForbidden,
+  ApiStandardNotFound,
+  ApiStandardServiceUnavailable,
+  ApiStandardTooManyRequests,
+  ApiStandardUnauthorized,
+} from '../common/swagger/api-error-responses';
 import { SubscriptionUsageGuard } from '../subscriptions/guards/subscription-usage.guard';
 import { CreateWebSearchDto } from './dto/create-web-search.dto';
 import { RecentSearchesQueryDto } from './dto/recent-searches-query.dto';
@@ -43,7 +47,7 @@ import {
 import { SearchService } from './search.service';
 
 @ApiTags('search')
-@ApiBearerAuth()
+@ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard)
 @Controller('web-search')
 export class SearchController {
@@ -55,13 +59,13 @@ export class SearchController {
   @ApiOperation({
     summary: 'Perform a web search',
     description:
-      'Validates subscription quota, executes the configured search provider, persists history, and records usage.',
+      'Validates subscription quota, executes the configured search provider, persists history, and records successful usage only. Caching (when Redis is available) is an internal optimization and is not exposed to clients.',
   })
   @ApiCreatedResponse({ type: WebSearchResponseDto })
-  @ApiBadRequestResponse({ description: 'Invalid search query' })
-  @ApiTooManyRequestsResponse({ description: 'Subscription usage limit exceeded' })
-  @ApiServiceUnavailableResponse({ description: 'Search provider not configured' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardBadRequest('Invalid search query')
+  @ApiStandardTooManyRequests('Subscription usage limit or HTTP rate limit exceeded')
+  @ApiStandardServiceUnavailable('Search provider not configured')
+  @ApiStandardUnauthorized()
   async search(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateWebSearchDto,
@@ -74,9 +78,13 @@ export class SearchController {
   }
 
   @Get('history')
-  @ApiOperation({ summary: 'List current user search history' })
+  @ApiOperation({
+    summary: 'List current user search history',
+    description: 'Returns a paginated list of the authenticated user web search history.',
+  })
   @ApiOkResponse({ type: PaginatedWebSearchHistoryDto })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async history(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: PaginationQueryDto,
@@ -85,9 +93,13 @@ export class SearchController {
   }
 
   @Get('recent')
-  @ApiOperation({ summary: 'List recent searches for the current user' })
+  @ApiOperation({
+    summary: 'List recent searches for the current user',
+    description: 'Returns the most recent search records for the authenticated user.',
+  })
   @ApiOkResponse({ type: [RecentSearchResponseDto] })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async recent(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: RecentSearchesQueryDto,
@@ -102,7 +114,8 @@ export class SearchController {
       'Returns distinct previous queries for the authenticated user, optionally filtered by a prefix/term.',
   })
   @ApiOkResponse({ type: SearchSuggestionsResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async suggestions(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: SearchSuggestionsQueryDto,
@@ -111,11 +124,16 @@ export class SearchController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get a single search history record' })
+  @ApiOperation({
+    summary: 'Get a single search history record',
+    description: 'Returns one owned web search history record by ID.',
+  })
+  @ApiParam({ name: 'id', description: 'Web search record UUID' })
   @ApiOkResponse({ type: WebSearchResponseDto })
-  @ApiNotFoundResponse({ description: 'Search record not found' })
-  @ApiForbiddenResponse({ description: 'Ownership violation' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardNotFound('Search record not found')
+  @ApiStandardForbidden('Ownership violation')
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async getOne(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -125,15 +143,20 @@ export class SearchController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Delete a search history record' })
-  @ApiOkResponse({ description: 'Search record deleted' })
-  @ApiNotFoundResponse({ description: 'Search record not found' })
-  @ApiForbiddenResponse({ description: 'Ownership violation' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiOperation({
+    summary: 'Delete a search history record',
+    description: 'Deletes an owned web search history record.',
+  })
+  @ApiParam({ name: 'id', description: 'Web search record UUID' })
+  @ApiOkResponse({ type: MessageResponseDto })
+  @ApiStandardNotFound('Search record not found')
+  @ApiStandardForbidden('Ownership violation')
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<{ message: string }> {
+  ): Promise<MessageResponseDto> {
     return this.searchService.deleteOne(user.id, id);
   }
 }

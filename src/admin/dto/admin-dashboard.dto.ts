@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaginationMetaDto } from '../../common/dto/pagination-meta.dto';
 
 export class AdminDashboardUsersStatsDto {
   @ApiProperty()
@@ -251,15 +252,8 @@ export class PaginatedAdminUsageLogsDto {
   @ApiProperty({ type: [AdminUsageLogItemDto] })
   items!: AdminUsageLogItemDto[];
 
-  @ApiProperty({
-    example: { page: 1, limit: 20, total: 100, totalPages: 5 },
-  })
-  meta!: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  @ApiProperty({ type: PaginationMetaDto })
+  meta!: PaginationMetaDto;
 }
 
 export class AdminSystemHealthDto {

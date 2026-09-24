@@ -15,22 +15,27 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
   ApiBearerAuth,
   ApiCreatedResponse,
-  ApiForbiddenResponse,
-  ApiNotFoundResponse,
+  ApiExtraModels,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
+  ApiProduces,
   ApiTags,
-  ApiTooManyRequestsResponse,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
+import {
+  ApiStandardBadRequest,
+  ApiStandardForbidden,
+  ApiStandardNotFound,
+  ApiStandardTooManyRequests,
+  ApiStandardUnauthorized,
+} from '../common/swagger/api-error-responses';
 import { SubscriptionUsageGuard } from '../subscriptions/guards/subscription-usage.guard';
 import { ChatService } from './chat.service';
 import { CreateConversationDto } from './dto/create-conversation.dto';
@@ -39,12 +44,22 @@ import {
   ConversationResponseDto,
   SendMessageResponseDto,
 } from './dto/conversation-response.dto';
-import { MessageResponseDto } from './dto/message-response.dto';
+import {
+  ConversationDeletedResponseDto,
+  PaginatedConversationsDto,
+  PaginatedMessagesDto,
+} from './dto/paginated-chat.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import {
+  StreamChunkEventDto,
+  StreamDoneEventDto,
+  StreamErrorEventDto,
+} from './dto/stream-events.dto';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 
 @ApiTags('chat')
-@ApiBearerAuth()
+@ApiBearerAuth('bearer')
+@ApiExtraModels(StreamChunkEventDto, StreamDoneEventDto, StreamErrorEventDto)
 @UseGuards(JwtAuthGuard)
 @Controller('conversations')
 export class ChatController {
@@ -52,10 +67,14 @@ export class ChatController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a conversation' })
+  @ApiOperation({
+    summary: 'Create a conversation',
+    description: 'Creates a new conversation owned by the authenticated user.',
+  })
   @ApiCreatedResponse({ type: ConversationResponseDto })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiBadRequestResponse({ description: 'Invalid provider or input' })
+  @ApiStandardUnauthorized()
+  @ApiStandardBadRequest()
+  @ApiStandardTooManyRequests()
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateConversationDto,
@@ -64,19 +83,32 @@ export class ChatController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List current user conversations' })
-  @ApiOkResponse({ description: 'Paginated conversation list' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  async list(@CurrentUser() user: AuthenticatedUser, @Query() query: PaginationQueryDto) {
+  @ApiOperation({
+    summary: 'List current user conversations',
+    description:
+      'Returns a paginated list of non-deleted conversations for the authenticated user.',
+  })
+  @ApiOkResponse({ type: PaginatedConversationsDto })
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: PaginationQueryDto,
+  ): Promise<PaginatedConversationsDto> {
     return this.chatService.listConversations(user.id, query.page, query.limit);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get a conversation with recent messages' })
+  @ApiOperation({
+    summary: 'Get a conversation with recent messages',
+    description: 'Returns conversation metadata and up to 200 recent messages.',
+  })
+  @ApiParam({ name: 'id', description: 'Conversation UUID' })
   @ApiOkResponse({ type: ConversationDetailResponseDto })
-  @ApiNotFoundResponse({ description: 'Conversation not found' })
-  @ApiForbiddenResponse({ description: 'Ownership violation' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardNotFound()
+  @ApiStandardForbidden()
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async getOne(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -85,11 +117,17 @@ export class ChatController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Update a conversation' })
+  @ApiOperation({
+    summary: 'Update a conversation',
+    description: 'Updates title, default provider, or model for an owned conversation.',
+  })
+  @ApiParam({ name: 'id', description: 'Conversation UUID' })
   @ApiOkResponse({ type: ConversationResponseDto })
-  @ApiNotFoundResponse({ description: 'Conversation not found' })
-  @ApiForbiddenResponse({ description: 'Ownership violation' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardBadRequest()
+  @ApiStandardNotFound()
+  @ApiStandardForbidden()
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async update(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -100,32 +138,40 @@ export class ChatController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Soft-delete a conversation' })
-  @ApiOkResponse({ description: 'Conversation deleted' })
-  @ApiNotFoundResponse({ description: 'Conversation not found' })
-  @ApiForbiddenResponse({ description: 'Ownership violation' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiOperation({
+    summary: 'Soft-delete a conversation',
+    description:
+      'Marks the conversation as deleted. Messages remain for audit but the conversation is hidden.',
+  })
+  @ApiParam({ name: 'id', description: 'Conversation UUID' })
+  @ApiOkResponse({ type: ConversationDeletedResponseDto })
+  @ApiStandardNotFound()
+  @ApiStandardForbidden()
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<{ message: string }> {
+  ): Promise<ConversationDeletedResponseDto> {
     return this.chatService.deleteConversation(user.id, id);
   }
 
   @Get(':id/messages')
-  @ApiOperation({ summary: 'List messages in a conversation' })
-  @ApiOkResponse({ description: 'Paginated messages' })
-  @ApiNotFoundResponse({ description: 'Conversation not found' })
-  @ApiForbiddenResponse({ description: 'Ownership violation' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiOperation({
+    summary: 'List messages in a conversation',
+    description: 'Returns a paginated message history for an owned conversation.',
+  })
+  @ApiParam({ name: 'id', description: 'Conversation UUID' })
+  @ApiOkResponse({ type: PaginatedMessagesDto })
+  @ApiStandardNotFound()
+  @ApiStandardForbidden()
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async listMessages(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: PaginationQueryDto,
-  ): Promise<{
-    items: MessageResponseDto[];
-    meta: { page: number; limit: number; total: number; totalPages: number };
-  }> {
+  ): Promise<PaginatedMessagesDto> {
     return this.chatService.listMessages(user.id, id, query.page, query.limit);
   }
 
@@ -135,14 +181,15 @@ export class ChatController {
   @ApiOperation({
     summary: 'Send a chat message and receive an AI response',
     description:
-      'Validates ownership and subscription quota, resolves an AI provider, persists user/assistant messages, and records usage.',
+      'Validates ownership and subscription quota, resolves an AI provider, persists user/assistant messages, and records successful usage only.',
   })
+  @ApiParam({ name: 'id', description: 'Conversation UUID' })
   @ApiOkResponse({ type: SendMessageResponseDto })
-  @ApiBadRequestResponse({ description: 'Invalid provider/model/key configuration' })
-  @ApiNotFoundResponse({ description: 'Conversation or provider not found' })
-  @ApiForbiddenResponse({ description: 'Ownership violation' })
-  @ApiTooManyRequestsResponse({ description: 'Subscription usage limit exceeded' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardBadRequest()
+  @ApiStandardNotFound()
+  @ApiStandardForbidden()
+  @ApiStandardTooManyRequests()
+  @ApiStandardUnauthorized()
   async sendMessage(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -161,20 +208,35 @@ export class ChatController {
   @Post(':id/messages/stream')
   @UseGuards(SubscriptionUsageGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiProduces('text/event-stream')
   @ApiOperation({
     summary: 'Send a chat message and stream the AI response (SSE)',
-    description:
-      'Server-Sent Events stream. Emits `chunk` events with partial text, then a final `done` event with persisted messages. Failed streams do not consume successful usage quota.',
+    description: [
+      'Streams the AI-generated response using Server-Sent Events.',
+      '',
+      'Event types:',
+      '- `chunk` → `{ "text": "..." }` partial assistant deltas',
+      '- `done` → `{ "userMessage": {...}, "assistantMessage": {...} }` after successful persistence',
+      '- `error` → `{ "message": "...", "statusCode": 502 }` on provider/stream failure',
+      '',
+      'Failed streams do not consume successful subscription quota. Client disconnect aborts the upstream provider stream.',
+    ].join('\n'),
   })
+  @ApiParam({ name: 'id', description: 'Conversation UUID' })
   @ApiOkResponse({
     description:
-      'text/event-stream: event=chunk data={"text":"..."} ; event=done data={userMessage,assistantMessage} ; event=error data={message,statusCode}',
+      'SSE stream (`text/event-stream`). See operation description for `chunk` / `done` / `error` payloads.',
+    schema: {
+      type: 'string',
+      example:
+        'event: chunk\ndata: {"text":"Hello "}\n\nevent: done\ndata: {"userMessage":{"id":"..."},"assistantMessage":{"id":"..."}}\n\n',
+    },
   })
-  @ApiBadRequestResponse({ description: 'Invalid provider/model/key configuration' })
-  @ApiNotFoundResponse({ description: 'Conversation or provider not found' })
-  @ApiForbiddenResponse({ description: 'Ownership violation' })
-  @ApiTooManyRequestsResponse({ description: 'Subscription or HTTP rate limit exceeded' })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
+  @ApiStandardBadRequest()
+  @ApiStandardNotFound()
+  @ApiStandardForbidden()
+  @ApiStandardTooManyRequests()
+  @ApiStandardUnauthorized()
   async streamMessage(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,

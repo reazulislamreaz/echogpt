@@ -11,16 +11,20 @@ import {
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
-  ApiConflictResponse,
-  ApiInternalServerErrorResponse,
+  ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiQuery,
-  ApiResponse,
   ApiTags,
-  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Request } from 'express';
+import {
+  ApiStandardBadRequest,
+  ApiStandardConflict,
+  ApiStandardInternalError,
+  ApiStandardTooManyRequests,
+  ApiStandardUnauthorized,
+} from '../common/swagger/api-error-responses';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -49,15 +53,13 @@ export class AuthController {
   @ApiOperation({
     summary: 'Register a new user account',
     description:
-      'Creates a new user record with USER role, securely hashes password with bcrypt, and sends an email verification token.',
+      'Creates a USER account, hashes the password with bcrypt, and sends an email verification token when SMTP is configured.',
   })
-  @ApiResponse({
-    status: HttpStatus.CREATED,
-    description: 'User registered successfully',
-    type: RegisterResponseDto,
-  })
-  @ApiConflictResponse({ description: 'Email address is already in use' })
-  @ApiInternalServerErrorResponse({ description: 'Server configuration error' })
+  @ApiCreatedResponse({ type: RegisterResponseDto })
+  @ApiStandardBadRequest()
+  @ApiStandardConflict('Email address is already in use')
+  @ApiStandardTooManyRequests()
+  @ApiStandardInternalError()
   async register(@Body() dto: RegisterDto): Promise<RegisterResponseDto> {
     return this.authService.register(dto);
   }
@@ -67,13 +69,12 @@ export class AuthController {
   @ApiOperation({
     summary: 'Log in with email and password',
     description:
-      'Authenticates user credentials, generates JWT access token and secure rotated refresh token, and creates a session.',
+      'Authenticates credentials, issues a JWT access token and opaque refresh token, and creates a session.',
   })
-  @ApiOkResponse({
-    description: 'Authentication successful',
-    type: LoginResponseDto,
-  })
-  @ApiUnauthorizedResponse({ description: 'Invalid credentials or inactive account' })
+  @ApiOkResponse({ type: LoginResponseDto })
+  @ApiStandardBadRequest()
+  @ApiStandardUnauthorized('Invalid credentials or inactive account')
+  @ApiStandardTooManyRequests()
   async login(@Body() dto: LoginDto, @Req() req: Request): Promise<LoginResponseDto> {
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
     const userAgent = req.headers['user-agent'];
@@ -86,15 +87,12 @@ export class AuthController {
   @ApiOperation({
     summary: 'Refresh access token',
     description:
-      'Validates the refresh token hash, rotates the refresh token, revokes the previous token, and issues a new JWT pair.',
+      'Validates the refresh token, rotates it, revokes the previous session token, and returns a new JWT pair.',
   })
-  @ApiOkResponse({
-    description: 'Tokens successfully refreshed',
-    type: AuthTokensDto,
-  })
-  @ApiUnauthorizedResponse({
-    description: 'Invalid, expired, or revoked refresh token',
-  })
+  @ApiOkResponse({ type: AuthTokensDto })
+  @ApiStandardBadRequest()
+  @ApiStandardUnauthorized('Invalid, expired, or revoked refresh token')
+  @ApiStandardTooManyRequests()
   async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request): Promise<AuthTokensDto> {
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
     const userAgent = req.headers['user-agent'];
@@ -104,18 +102,16 @@ export class AuthController {
 
   @Post('logout')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('bearer')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Log out current user',
     description:
-      'Revokes active refresh token sessions for the authenticated user to prevent token replay.',
+      'Revokes the provided refresh token session (or all active sessions when omitted) for the authenticated user.',
   })
-  @ApiOkResponse({
-    description: 'Logged out successfully',
-    type: MessageResponseDto,
-  })
-  @ApiUnauthorizedResponse({ description: 'Authentication token required' })
+  @ApiOkResponse({ type: MessageResponseDto })
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async logout(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: LogoutDto,
@@ -125,17 +121,15 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
+  @ApiBearerAuth('bearer')
   @ApiOperation({
     summary: 'Get current authenticated user profile',
     description:
-      'Returns the safe profile representation of the authenticated user without exposing passwords or tokens.',
+      'Returns the safe profile of the authenticated user. Never includes password or token hashes.',
   })
-  @ApiOkResponse({
-    description: 'Current user profile details',
-    type: UserResponseDto,
-  })
-  @ApiUnauthorizedResponse({ description: 'Authentication token required' })
+  @ApiOkResponse({ type: UserResponseDto })
+  @ApiStandardUnauthorized()
+  @ApiStandardTooManyRequests()
   async getMe(@CurrentUser() user: AuthenticatedUser): Promise<UserResponseDto> {
     return this.authService.getCurrentUser(user.id);
   }
@@ -145,21 +139,18 @@ export class AuthController {
   @ApiOperation({
     summary: 'Verify email address via link',
     description:
-      'Accepts the verification token from the email link query string (?token=...). Marks the account verified when the token is valid.',
+      'Accepts the verification token from the email link query string (`?token=...`). Marks the account verified when valid.',
   })
   @ApiQuery({
     name: 'token',
     required: true,
-    description: 'Raw verification token from the email link',
+    description:
+      'Raw verification token from the email link (never log or store client-side long-term)',
+    example: 'example-verification-token',
   })
-  @ApiOkResponse({
-    description: 'Email successfully verified',
-    type: MessageResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid, expired, or previously used verification token',
-  })
+  @ApiOkResponse({ type: MessageResponseDto })
+  @ApiStandardBadRequest('Invalid, expired, or previously used verification token')
+  @ApiStandardTooManyRequests()
   async verifyEmailFromLink(@Query('token') token: string): Promise<MessageResponseDto> {
     return this.authService.verifyEmail(token);
   }
@@ -168,17 +159,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Verify email address',
-    description:
-      'Verifies the user email using a single-use token sent during registration or resend.',
+    description: 'Verifies the user email using a single-use token from registration or resend.',
   })
-  @ApiOkResponse({
-    description: 'Email successfully verified',
-    type: MessageResponseDto,
-  })
-  @ApiResponse({
-    status: HttpStatus.BAD_REQUEST,
-    description: 'Invalid, expired, or previously used verification token',
-  })
+  @ApiOkResponse({ type: MessageResponseDto })
+  @ApiStandardBadRequest('Invalid, expired, or previously used verification token')
+  @ApiStandardTooManyRequests()
   async verifyEmail(@Body() dto: VerifyEmailDto): Promise<MessageResponseDto> {
     return this.authService.verifyEmail(dto.token);
   }
@@ -188,12 +173,11 @@ export class AuthController {
   @ApiOperation({
     summary: 'Resend email verification link',
     description:
-      'Dispatches a new verification token to the provided email address if an unverified account exists.',
+      'Dispatches a new verification token when an unverified account exists. Always returns a generic confirmation to avoid account enumeration.',
   })
-  @ApiOkResponse({
-    description: 'Generic confirmation message (safeguards against account enumeration)',
-    type: MessageResponseDto,
-  })
+  @ApiOkResponse({ type: MessageResponseDto })
+  @ApiStandardBadRequest()
+  @ApiStandardTooManyRequests()
   async resendVerification(@Body() dto: ResendVerificationDto): Promise<MessageResponseDto> {
     return this.authService.resendVerification(dto.email);
   }
