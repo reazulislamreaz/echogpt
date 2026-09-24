@@ -375,6 +375,7 @@ export class AdminService {
       currentPeriodRequests = await this.prisma.aPIUsageLog.count({
         where: {
           userId,
+          statusCode: { gte: 200, lt: 400 },
           createdAt: {
             gte: activeSub.currentPeriodStart,
             lt: activeSub.currentPeriodEnd,

@@ -25,7 +25,8 @@ export class UsageService {
 
   /**
    * Calculates metered request count for a user within a [startDate, endDate) interval.
-   * Performs an efficient database COUNT aggregation.
+   * Only successful responses (HTTP 2xx/3xx) consume subscription quota.
+   * Failed provider/API attempts remain in APIUsageLog for analytics but do not burn quota.
    * Excludes unmetered/system logs (where userId is NULL).
    */
   async getUsageCount(userId: string, startDate: Date, endDate: Date): Promise<number> {
@@ -36,6 +37,10 @@ export class UsageService {
     const count = await this.prisma.aPIUsageLog.count({
       where: {
         userId,
+        statusCode: {
+          gte: 200,
+          lt: 400,
+        },
         createdAt: {
           gte: startDate,
           lt: endDate,

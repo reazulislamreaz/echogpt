@@ -9,6 +9,7 @@ Production-oriented NestJS REST API for the EchoGPT Chrome Extension.
 - JWT authentication + refresh-token sessions
 - RBAC (USER / ADMIN)
 - Swagger / OpenAPI
+- Security headers (Helmet-compatible)
 - Docker
 - Jest + ESLint + Prettier
 
@@ -84,7 +85,7 @@ src/
 
 ### Subscriptions (`/api/v1/subscriptions`)
 - Plans, current subscription/status, upgrade, downgrade
-- Usage counted dynamically from `APIUsageLog` (no duplicated counters)
+- Usage counted dynamically from successful `APIUsageLog` entries (no duplicated counters)
 - `requestLimit = null` → unlimited; exceeded limit → HTTP 429
 
 ### AI Providers
@@ -123,7 +124,7 @@ Public probes remain on `GET /api/v1/health`.
 - Controllers → Services → Prisma → PostgreSQL
 - JWT access tokens + hashed refresh tokens in `Session`
 - AI provider API keys encrypted with `ENCRYPTION_KEY`
-- Usage metering: `APIUsageLog` aggregation over billing period
+- Usage metering: successful `APIUsageLog` aggregation over billing period (failures logged, not billed)
 - Ownership checks on conversations, messages, and search history
 
 ## Known limitations / bonus (not core)
@@ -141,7 +142,8 @@ Public probes remain on `GET /api/v1/health`.
 - **Status Lifecycle**: `ACTIVE`, `TRIALING`, `PAST_DUE`, `CANCELED`, `EXPIRED`.
 
 ### Usage Calculation & Billing Boundaries
-- **Dynamic Metering**: Requests counted from `APIUsageLog` with a DB-level `COUNT`.
+- **Dynamic Metering**: Successful requests (HTTP 2xx/3xx) are counted from `APIUsageLog` with a DB-level `COUNT`.
+- **Failed provider calls**: Still recorded in `APIUsageLog` for analytics/admin logs, but **do not consume** subscription quota.
 - **No Duplicated State**: No stored `remainingRequests` / `currentUsage` columns.
 - **Billing Period**: Half-open interval `[currentPeriodStart, currentPeriodEnd)`.
 - **Quota Exceeded**: HTTP 429 with subscription limit semantics.

@@ -37,6 +37,10 @@ describe('UsageService', () => {
       expect(prisma.aPIUsageLog.count).toHaveBeenCalledWith({
         where: {
           userId: 'user-1',
+          statusCode: {
+            gte: 200,
+            lt: 400,
+          },
           createdAt: {
             gte: start,
             lt: end,

@@ -164,20 +164,6 @@ export class AdminController {
     return this.adminService.getUsageAnalytics(query);
   }
 
-  @Get('usage/analytics')
-  @ApiOperation({
-    summary: 'Usage analytics (alias)',
-    description: 'Alias of GET /admin/usage for backward compatibility.',
-  })
-  @ApiOkResponse({ type: AdminUsageAnalyticsDto })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
-  async usageAnalytics(
-    @Query() query: AdminUsageAnalyticsQueryDto,
-  ): Promise<AdminUsageAnalyticsDto> {
-    return this.adminService.getUsageAnalytics(query);
-  }
-
   // ========== Request logs ==========
 
   @Get('logs')
@@ -193,18 +179,6 @@ export class AdminController {
     return this.adminService.getUsageLogs(query);
   }
 
-  @Get('usage/logs')
-  @ApiOperation({
-    summary: 'List API request logs (alias)',
-    description: 'Alias of GET /admin/logs for backward compatibility.',
-  })
-  @ApiOkResponse({ type: PaginatedAdminUsageLogsDto })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
-  async usageLogs(@Query() query: AdminUsageLogsQueryDto): Promise<PaginatedAdminUsageLogsDto> {
-    return this.adminService.getUsageLogs(query);
-  }
-
   // ========== System health ==========
 
   @Get('system/health')
@@ -217,18 +191,6 @@ export class AdminController {
   @ApiUnauthorizedResponse({ description: 'Authentication required' })
   @ApiForbiddenResponse({ description: 'ADMIN role required' })
   async systemHealth(): Promise<AdminSystemHealthDto> {
-    return this.adminService.getSystemHealth();
-  }
-
-  @Get('health')
-  @ApiOperation({
-    summary: 'Admin system health (alias)',
-    description: 'Alias of GET /admin/system/health for backward compatibility.',
-  })
-  @ApiOkResponse({ type: AdminSystemHealthDto })
-  @ApiUnauthorizedResponse({ description: 'Authentication required' })
-  @ApiForbiddenResponse({ description: 'ADMIN role required' })
-  async health(): Promise<AdminSystemHealthDto> {
     return this.adminService.getSystemHealth();
   }
 }
