@@ -37,6 +37,8 @@ async function bootstrap(): Promise<void> {
       .setVersion('1.0')
       .addBearerAuth()
       .addTag('health')
+      .addTag('auth')
+      .addTag('users')
       .build();
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
