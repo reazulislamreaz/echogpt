@@ -215,7 +215,7 @@ Set `DATABASE_URL`, `JWT_ACCESS_SECRET`, `ENCRYPTION_KEY`, `ADMIN_EMAIL`, and `A
 Start PostgreSQL, then apply the included migrations and seed:
 
 ```bash
-docker compose up -d postgres
+docker compose up -d postgres redis
 npx prisma generate
 npx prisma migrate deploy
 npm run prisma:seed
