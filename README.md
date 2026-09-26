@@ -247,7 +247,9 @@ docker compose up -d postgres redis    # both
 docker compose --profile full up -d --build   # API + PostgreSQL + Redis
 ```
 
-Redis is optional. To enable it, set `REDIS_HOST=127.0.0.1` and `REDIS_PORT=6379`, leave `REDIS_PASSWORD` empty for the Compose container, and restart the API. `.env` is read only at startup.
+The full-profile API container applies Prisma migrations on startup. Seed is still a separate step: `npm run prisma:seed` from the host once Postgres is up.
+
+Redis is optional. To enable it for a local Node process, set `REDIS_HOST=127.0.0.1` and `REDIS_PORT=6379`, leave `REDIS_PASSWORD` empty for the Compose container, and restart the API. `.env` is read only at startup.
 
 ## Testing
 

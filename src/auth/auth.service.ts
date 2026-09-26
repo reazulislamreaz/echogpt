@@ -27,6 +27,9 @@ import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { EmailService } from './services/email.service';
 import { generateRandomToken, hashToken, parseDurationToMs } from './utils/token.util';
 
+/** bcrypt hash used so unknown emails take a similar compare time as real accounts. */
+const DUMMY_PASSWORD_HASH = '$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy';
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -180,12 +183,17 @@ export class AuthService {
       include: { role: true },
     });
 
-    // Check existence and deleted status with generic error to prevent email enumeration
+    // Unknown and deleted accounts share one error and a dummy compare, so status is not revealed first.
     if (!user || user.deletedAt !== null) {
+      await bcrypt.compare(dto.password, DUMMY_PASSWORD_HASH);
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    // Check account active status
+    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid email or password');
+    }
+
     if (!user.isActive) {
       throw new UnauthorizedException('User account is deactivated');
     }
@@ -198,12 +206,6 @@ export class AuthService {
       throw new UnauthorizedException(
         'Email verification is required before login. Please verify your email address.',
       );
-    }
-
-    // Constant-time password comparison
-    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid email or password');
     }
 
     // Generate JWT access token
@@ -268,8 +270,12 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    // If session has already been revoked, token reuse / replay detected
+    // Reuse of a rotated token revokes every remaining session for that user.
     if (session.revokedAt !== null) {
+      await this.prisma.session.updateMany({
+        where: { userId: session.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
       throw new UnauthorizedException('Refresh token has been revoked');
     }
 
@@ -303,12 +309,20 @@ export class AuthService {
     const refreshExpiresInMs = parseDurationToMs(this.jwtRefreshExpiresIn);
     const newRefreshExpiresAt = new Date(Date.now() + refreshExpiresInMs);
 
-    // In transaction: revoke old session and persist new rotated session
-    await this.prisma.$transaction(async (tx) => {
-      await tx.session.update({
-        where: { id: session.id },
+    // Revoke only if this session is still active, so two parallel refreshes cannot both succeed.
+    const rotated = await this.prisma.$transaction(async (tx) => {
+      const revoked = await tx.session.updateMany({
+        where: { id: session.id, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+
+      if (revoked.count !== 1) {
+        await tx.session.updateMany({
+          where: { userId: session.userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+        return false;
+      }
 
       await tx.session.create({
         data: {
@@ -319,7 +333,12 @@ export class AuthService {
           expiresAt: newRefreshExpiresAt,
         },
       });
+      return true;
     });
+
+    if (!rotated) {
+      throw new UnauthorizedException('Refresh token has been revoked');
+    }
 
     return {
       accessToken: newAccessToken,

@@ -87,7 +87,7 @@ export class SubscriptionsService {
     if (now >= activeSub.currentPeriodEnd) {
       if (activeSub.canceledAt !== null) {
         const subToCancel = activeSub;
-        // Scheduled cancellation period has finished — transition to CANCELED and provision Free
+        // Scheduled downgrade period has finished — activate the chosen plan (Free if none).
         activeSub = await this.prisma.$transaction(async (tx) => {
           await tx.subscription.update({
             where: { id: subToCancel.id },
@@ -97,29 +97,35 @@ export class SubscriptionsService {
             },
           });
 
-          const freePlan = await tx.subscriptionPlan.findUnique({
-            where: { slug: 'free' },
-          });
+          const nextPlan = await this.resolveScheduledPlan(tx, subToCancel.scheduledPlanId);
+          const currentPeriodEnd = calculateNextPeriodEnd(now, nextPlan.billingCycle);
 
-          if (!freePlan) {
-            throw new InternalServerErrorException('Default FREE plan is not configured');
+          try {
+            return await tx.subscription.create({
+              data: {
+                userId,
+                planId: nextPlan.id,
+                status: SubscriptionStatus.ACTIVE,
+                startDate: now,
+                currentPeriodStart: now,
+                currentPeriodEnd,
+              },
+              include: {
+                plan: true,
+              },
+            });
+          } catch (error) {
+            if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+              const existing = await tx.subscription.findFirst({
+                where: { userId, status: SubscriptionStatus.ACTIVE },
+                include: { plan: true },
+              });
+              if (existing) {
+                return existing;
+              }
+            }
+            throw error;
           }
-
-          const currentPeriodEnd = calculateNextPeriodEnd(now, freePlan.billingCycle);
-
-          return tx.subscription.create({
-            data: {
-              userId,
-              planId: freePlan.id,
-              status: SubscriptionStatus.ACTIVE,
-              startDate: now,
-              currentPeriodStart: now,
-              currentPeriodEnd,
-            },
-            include: {
-              plan: true,
-            },
-          });
         });
       } else {
         // Active subscription rollover into new cycle
@@ -253,6 +259,7 @@ export class SubscriptionsService {
         data: {
           canceledAt: null,
           endDate: null,
+          scheduledPlanId: null,
         },
         include: {
           plan: true,
@@ -339,6 +346,7 @@ export class SubscriptionsService {
       data: {
         canceledAt: new Date(),
         endDate: currentSub.currentPeriodEnd,
+        scheduledPlanId: targetPlan.id,
       },
       include: {
         plan: true,
@@ -346,6 +354,32 @@ export class SubscriptionsService {
     });
 
     return this.toSafeSubscription(updatedSub);
+  }
+
+  /**
+   * Resolves the plan that should become active when a scheduled downgrade ends.
+   * Missing or inactive targets fall back to Free.
+   */
+  private async resolveScheduledPlan(
+    tx: Prisma.TransactionClient,
+    scheduledPlanId: string | null,
+  ): Promise<SubscriptionPlan> {
+    if (scheduledPlanId) {
+      const scheduled = await tx.subscriptionPlan.findUnique({
+        where: { id: scheduledPlanId },
+      });
+      if (scheduled?.isActive) {
+        return scheduled;
+      }
+    }
+
+    const freePlan = await tx.subscriptionPlan.findUnique({
+      where: { slug: 'free' },
+    });
+    if (!freePlan) {
+      throw new InternalServerErrorException('Default FREE plan is not configured');
+    }
+    return freePlan;
   }
 
   /**

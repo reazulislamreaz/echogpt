@@ -203,15 +203,11 @@ describe('Authentication & Authorization (e2e)', () => {
         .expect(401);
     });
 
-    it('should allow refreshing with the new rotated refresh token', async () => {
-      const res = await request(app.getHttpServer())
+    it('should revoke the rotated session when the previous refresh token is replayed', async () => {
+      await request(app.getHttpServer())
         .post('/api/v1/auth/refresh')
         .send({ refreshToken: rotatedRefreshToken })
-        .expect(200);
-
-      expect(res.body.accessToken).toBeDefined();
-      refreshToken = res.body.refreshToken;
-      accessToken = res.body.accessToken;
+        .expect(401);
     });
   });
 

@@ -142,7 +142,8 @@ model SubscriptionPlan {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  subscriptions Subscription[]
+  subscriptions          Subscription[]
+  scheduledSubscriptions Subscription[] @relation("ScheduledPlan")
 
   @@map("subscription_plans")
 }
@@ -162,6 +163,9 @@ model Subscription {
   currentPeriodStart DateTime           @default(now()) @map("current_period_start")
   currentPeriodEnd   DateTime           @map("current_period_end")
   canceledAt         DateTime?          @map("canceled_at")
+  /// Plan to activate when a scheduled downgrade reaches currentPeriodEnd.
+  scheduledPlanId    String?            @map("scheduled_plan_id") @db.Uuid
+  scheduledPlan      SubscriptionPlan?  @relation("ScheduledPlan", fields: [scheduledPlanId], references: [id], onDelete: SetNull)
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
@@ -169,6 +173,7 @@ model Subscription {
   @@index([status])
   @@index([planId])
   @@index([endDate])
+  @@index([scheduledPlanId])
   @@map("subscriptions")
 }
 

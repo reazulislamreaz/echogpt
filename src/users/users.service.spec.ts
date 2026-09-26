@@ -37,6 +37,7 @@ describe('UsersService', () => {
       user: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
+        count: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
       },
@@ -68,6 +69,23 @@ describe('UsersService', () => {
 
     service = module.get<UsersService>(UsersService);
     prisma = module.get(PrismaService);
+  });
+
+  describe('findAll', () => {
+    it('should omit soft-deleted users', async () => {
+      prisma.user.findMany.mockResolvedValue([mockUser]);
+      prisma.user.count.mockResolvedValue(1);
+
+      const result = await service.findAll(1, 20);
+
+      expect(result.items).toHaveLength(1);
+      expect(prisma.user.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { deletedAt: null },
+        }),
+      );
+      expect(prisma.user.count).toHaveBeenCalledWith({ where: { deletedAt: null } });
+    });
   });
 
   describe('findById & findByEmail', () => {

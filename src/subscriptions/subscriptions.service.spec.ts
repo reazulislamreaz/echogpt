@@ -311,7 +311,7 @@ describe('SubscriptionsService', () => {
       expect(prisma.subscription.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: premiumPendingDowngrade.id },
-          data: { canceledAt: null, endDate: null },
+          data: { canceledAt: null, endDate: null, scheduledPlanId: null },
         }),
       );
       expect(prisma.$transaction).not.toHaveBeenCalled();
@@ -341,6 +341,7 @@ describe('SubscriptionsService', () => {
           data: expect.objectContaining({
             canceledAt: expect.any(Date),
             endDate: activePremiumSub.currentPeriodEnd,
+            scheduledPlanId: mockFreePlan.id,
           }),
         }),
       );
