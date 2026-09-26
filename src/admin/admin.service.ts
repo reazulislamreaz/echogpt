@@ -693,11 +693,36 @@ export class AdminService {
     const effectiveFrom = from ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const effectiveTo = to ?? new Date();
 
+    const conditions: Prisma.Sql[] = [
+      Prisma.sql`created_at >= ${effectiveFrom}`,
+      Prisma.sql`created_at < ${effectiveTo}`,
+    ];
+    if (typeof where.userId === 'string') {
+      conditions.push(Prisma.sql`user_id = ${where.userId}::uuid`);
+    }
+    if (typeof where.provider === 'string') {
+      conditions.push(Prisma.sql`provider = ${where.provider}`);
+    }
+    if (typeof where.endpoint === 'string') {
+      conditions.push(Prisma.sql`endpoint = ${where.endpoint}`);
+    }
+    if (typeof where.method === 'string') {
+      conditions.push(Prisma.sql`method = ${where.method}::"HttpMethod"`);
+    }
+    if (typeof where.statusCode === 'number') {
+      conditions.push(Prisma.sql`status_code = ${where.statusCode}`);
+    }
+    if (typeof where.model === 'string') {
+      conditions.push(Prisma.sql`model = ${where.model}`);
+    }
+    if (typeof where.requestId === 'string') {
+      conditions.push(Prisma.sql`request_id = ${where.requestId}`);
+    }
+
     const rows = await this.prisma.$queryRaw<Array<{ day: Date; request_count: bigint }>>`
       SELECT DATE_TRUNC('day', created_at) AS day, COUNT(*)::bigint AS request_count
       FROM api_usage_logs
-      WHERE created_at >= ${effectiveFrom}
-        AND created_at < ${effectiveTo}
+      WHERE ${Prisma.join(conditions, ' AND ')}
       GROUP BY 1
       ORDER BY 1 DESC
       LIMIT 30

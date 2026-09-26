@@ -52,8 +52,11 @@ export class UsersService {
   }> {
     const skip = (page - 1) * limit;
 
+    const where = { deletedAt: null };
+
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
+        where,
         skip,
         take: limit,
         include: {
@@ -63,7 +66,7 @@ export class UsersService {
           createdAt: 'desc',
         },
       }),
-      this.prisma.user.count(),
+      this.prisma.user.count({ where }),
     ]);
 
     return {

@@ -232,17 +232,17 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     );
   }
 
-  const smtpFields = [
+  const smtpCredentialCount = [
     validated.SMTP_HOST,
     validated.SMTP_USER,
     validated.SMTP_PASS,
     validated.SMTP_FROM,
-    validated.EMAIL_VERIFICATION_URL,
-  ];
-  const smtpConfiguredCount = smtpFields.filter((value) =>
-    Boolean(value && String(value).trim()),
-  ).length;
-  if (smtpConfiguredCount > 0 && smtpConfiguredCount < smtpFields.length) {
+  ].filter((value) => Boolean(value && String(value).trim())).length;
+  const hasVerificationUrl = Boolean(
+    validated.EMAIL_VERIFICATION_URL && String(validated.EMAIL_VERIFICATION_URL).trim(),
+  );
+  // A verification URL by itself does not enable SMTP. Credentials must be complete together.
+  if (smtpCredentialCount > 0 && (smtpCredentialCount < 4 || !hasVerificationUrl)) {
     throw new Error(
       'Environment validation failed: Email service configuration is incomplete. Set SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_FROM, and EMAIL_VERIFICATION_URL together.',
     );

@@ -106,7 +106,7 @@ export class UsersController {
   @ApiOperation({
     summary: 'List users with pagination (Admin only)',
     description:
-      'Returns a paginated list of registered users in safe representation. Requires ADMIN role.',
+      'Returns a paginated list of active users. Soft-deleted accounts are omitted. Requires ADMIN role.',
   })
   @ApiOkResponse({ type: PaginatedUsersDto })
   @ApiStandardUnprocessable()

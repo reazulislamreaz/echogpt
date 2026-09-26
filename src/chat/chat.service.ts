@@ -106,11 +106,12 @@ export class ChatService {
     conversationId: string,
   ): Promise<ConversationDetailResponseDto> {
     const conversation = await this.getOwnedConversation(userId, conversationId);
-    const messages = await this.prisma.message.findMany({
+    const latestMessages = await this.prisma.message.findMany({
       where: { conversationId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
       take: 200,
     });
+    const messages = latestMessages.reverse();
 
     return {
       ...this.toSafeConversation(conversation),
@@ -206,12 +207,7 @@ export class ChatService {
       DEFAULT_MODELS[credentials.provider.slug.toUpperCase()] ||
       'gpt-4o-mini';
 
-    const history = await this.prisma.message.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: 'asc' },
-      take: 40,
-      select: { role: true, content: true },
-    });
+    const history = await this.loadRecentMessages(conversationId, 40);
 
     const completionMessages = [
       ...history
@@ -348,12 +344,7 @@ export class ChatService {
       DEFAULT_MODELS[credentials.provider.slug.toUpperCase()] ||
       'gpt-4o-mini';
 
-    const history = await this.prisma.message.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: 'asc' },
-      take: 40,
-      select: { role: true, content: true },
-    });
+    const history = await this.loadRecentMessages(conversationId, 40);
 
     const completionMessages = [
       ...history
@@ -535,6 +526,17 @@ export class ChatService {
     if (!provider.isActive) {
       throw new BadRequestException('AI provider is inactive');
     }
+  }
+
+  /** Latest messages in chronological order, so long threads keep recent context. */
+  private async loadRecentMessages(conversationId: string, take: number) {
+    const latest = await this.prisma.message.findMany({
+      where: { conversationId },
+      orderBy: { createdAt: 'desc' },
+      take,
+      select: { role: true, content: true },
+    });
+    return latest.reverse();
   }
 
   private buildTitleFromPrompt(content: string): string {

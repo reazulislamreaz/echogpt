@@ -163,4 +163,14 @@ describe('AdminService', () => {
     expect(result.items[0].errorMessage).not.toContain('sk-secret');
     expect(result.items[0].errorMessage).toContain('[redacted]');
   });
+
+  it('includes usage filters in the daily aggregation query', async () => {
+    const userId = '11111111-1111-1111-1111-111111111111';
+
+    await service.getUsageAnalytics({ userId, provider: 'OPENAI' });
+
+    const serialized = JSON.stringify(prisma.$queryRaw.mock.calls);
+    expect(serialized).toContain(userId);
+    expect(serialized).toContain('OPENAI');
+  });
 });

@@ -58,7 +58,7 @@ describe('AuthService', () => {
         create: jest.fn(),
         findUnique: jest.fn(),
         update: jest.fn(),
-        updateMany: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       emailVerificationToken: {
         create: jest.fn(),
@@ -409,9 +409,9 @@ describe('AuthService', () => {
       expect(result.accessToken).toBe('mock-jwt-access-token');
       expect(result.refreshToken).toBeDefined();
       expect(result.refreshToken).not.toBe(rawRefreshToken);
-      expect(prismaService.session.update).toHaveBeenCalledWith(
+      expect(prismaService.session.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: activeSession.id },
+          where: { id: activeSession.id, revokedAt: null },
           data: expect.objectContaining({ revokedAt: expect.any(Date) }),
         }),
       );
@@ -435,6 +435,11 @@ describe('AuthService', () => {
       prismaService.session.findUnique.mockResolvedValue(revokedSession);
 
       await expect(authService.refresh(rawRefreshToken)).rejects.toThrow(UnauthorizedException);
+      expect(prismaService.session.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: mockUser.id, revokedAt: null },
+        }),
+      );
     });
 
     it('should reject expired refresh token session', async () => {
