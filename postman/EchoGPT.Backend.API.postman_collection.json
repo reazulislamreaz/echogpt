@@ -1,0 +1,2977 @@
+{
+  "info": {
+    "name": "EchoGPT Backend API",
+    "description": "Production Postman collection generated from the live EchoGPT OpenAPI document (`GET /api/docs-json`).\n\n**Base path:** `{{baseUrl}}` defaults to `http://localhost:3000/api/v1`.\n\n**Auth:** Most endpoints use Bearer JWT. Run Auth \u2192 Login (or Log in as seeded admin) to populate `accessToken` / `refreshToken`.\n\n**Coverage:** 63 Swagger operations mapped 1:1 (+ 1 convenience admin login alias).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "userEmail",
+      "value": "user@example.com"
+    },
+    {
+      "key": "userPassword",
+      "value": "StrongPassword123!"
+    },
+    {
+      "key": "adminEmail",
+      "value": "admin@echogpt.local"
+    },
+    {
+      "key": "adminPassword",
+      "value": "AdminPassword123!"
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "conversationId",
+      "value": ""
+    },
+    {
+      "key": "searchId",
+      "value": ""
+    },
+    {
+      "key": "providerId",
+      "value": ""
+    },
+    {
+      "key": "planId",
+      "value": ""
+    },
+    {
+      "key": "subscriptionId",
+      "value": ""
+    },
+    {
+      "key": "resourceId",
+      "value": ""
+    },
+    {
+      "key": "emailVerificationToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "Endpoints tagged `health` from EchoGPT OpenAPI.",
+      "item": [
+        {
+          "name": "Application health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Reports application health. Database is critical (HTTP 503 when down). Redis and SMTP are informational optional dependencies and do not fail the overall status when unavailable.\n\n**Swagger:** `GET /api/v1/health`\n\n**operationId:** `HealthController_check_v1`\n\n**Auth:** Public",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Endpoints tagged `auth` from EchoGPT OpenAPI.",
+      "item": [
+        {
+          "name": "Log in with email and password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Authenticates credentials, issues a JWT access token and opaque refresh token, and creates a session.\n\n**Swagger:** `POST /api/v1/auth/login`\n\n**operationId:** `AuthController_login_v1`\n\n**Auth:** Public",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "  if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                  "  if (json.user && json.user.id) pm.collectionVariables.set('userId', json.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Log in as seeded admin",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Convenience request to obtain an ADMIN JWT using collection variables. Not an extra Swagger endpoint \u2014 same as `POST /auth/login`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "  if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                  "  if (json.user && json.user.id) pm.collectionVariables.set('userId', json.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Log out current user",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Revokes the provided refresh token session (or all active sessions when omitted) for the authenticated user.\n\n**Swagger:** `POST /api/v1/auth/logout`\n\n**operationId:** `AuthController_logout_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get current authenticated user profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "me"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Returns the safe profile of the authenticated user. Never includes password or token hashes.\n\n**Swagger:** `GET /api/v1/auth/me`\n\n**operationId:** `AuthController_getMe_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh access token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Validates the refresh token, rotates it, revokes the previous session token, and returns a new JWT pair.\n\n**Swagger:** `POST /api/v1/auth/refresh`\n\n**operationId:** `AuthController_refresh_v1`\n\n**Auth:** Public",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
+                  "  if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register a new user account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Creates a USER account, hashes the password with bcrypt, and sends an email verification token when SMTP is configured.\n\n**Swagger:** `POST /api/v1/auth/register`\n\n**operationId:** `AuthController_register_v1`\n\n**Auth:** Public",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.user && json.user.id) pm.collectionVariables.set('userId', json.user.id);",
+                  "  if (json.user && json.user.email) pm.collectionVariables.set('userEmail', json.user.email);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resend email verification link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/resend-verification",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "resend-verification"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Dispatches a new verification token when an unverified account exists. Always returns a generic confirmation to avoid account enumeration.\n\n**Swagger:** `POST /api/v1/auth/resend-verification`\n\n**operationId:** `AuthController_resendVerification_v1`\n\n**Auth:** Public",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify email address via link",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email?token=example-verification-token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ],
+              "variable": [],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "example-verification-token",
+                  "description": "Raw verification token from the email link (never log or store client-side long-term) (required)",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Accepts the verification token from the email link query string (`?token=...`). Marks the account verified when valid.\n\n**Swagger:** `GET /api/v1/auth/verify-email`\n\n**operationId:** `AuthController_verifyEmailFromLink_v1`\n\n**Auth:** Public",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify email address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Verifies the user email using a single-use token from registration or resend.\n\n**Swagger:** `POST /api/v1/auth/verify-email`\n\n**operationId:** `AuthController_verifyEmail_v1`\n\n**Auth:** Public",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{emailVerificationToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "description": "Endpoints tagged `users` from EchoGPT OpenAPI.",
+      "item": [
+        {
+          "name": "List users with pagination (Admin only)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users"
+              ],
+              "variable": [],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number for pagination (1-indexed) (optional)",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of items per page (max 100) (optional)",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns a paginated list of registered users in safe representation. Requires ADMIN role.\n\n**Swagger:** `GET /api/v1/users`\n\n**operationId:** `UsersController_findAll_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get current user profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Returns the authenticated user profile without passwords, token hashes, or other internal security fields.\n\n**Swagger:** `GET /api/v1/users/me`\n\n**operationId:** `UsersController_getProfile_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update current user profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Updates firstName, lastName, and avatarUrl. Identity fields (id, email, password, role) cannot be changed here.\n\n**Swagger:** `PATCH /api/v1/users/me`\n\n**operationId:** `UsersController_updateProfile_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"Name\",\n  \"avatarUrl\": \"https://example.com/avatar.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Soft-delete current user account",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Deactivates the account and revokes active sessions while preserving historical records.\n\n**Swagger:** `DELETE /api/v1/users/me`\n\n**operationId:** `UsersController_deleteAccount_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change account password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/users/me/password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "password"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Verifies the current password, hashes the new password, updates the account, and revokes active refresh sessions.\n\n**Swagger:** `PATCH /api/v1/users/me/password`\n\n**operationId:** `UsersController_changePassword_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{userPassword}}\",\n  \"newPassword\": \"NewStrongPassword123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get user by ID (Admin only)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{userId}}",
+                  "description": "User UUID"
+                }
+              ],
+              "query": []
+            },
+            "description": "Retrieves safe user information for a given user ID. Requires ADMIN role.\n\n**Swagger:** `GET /api/v1/users/{id}`\n\n**operationId:** `UsersController_findOne_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Subscriptions",
+      "description": "Endpoints tagged `subscriptions` from EchoGPT OpenAPI.",
+      "item": [
+        {
+          "name": "Downgrade subscription plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/downgrade",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "downgrade"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Schedules a subscription downgrade at the end of the current billing cycle, preserving entitlements until expiration.\n\n**Swagger:** `POST /api/v1/subscriptions/downgrade`\n\n**operationId:** `SubscriptionsController_downgrade_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planSlug\": \"free\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get current user subscription",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Returns the authenticated user active subscription, plan details, and current billing cycle window.\n\n**Swagger:** `GET /api/v1/subscriptions/me`\n\n**operationId:** `SubscriptionsController_getMySubscription_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List active subscription plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "plans"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Returns publicly available active subscription tiers with prices and request limits. `requestLimit: null` means unlimited.\n\n**Swagger:** `GET /api/v1/subscriptions/plans`\n\n**operationId:** `SubscriptionsController_getPlans_v1`\n\n**Auth:** Public",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get subscription usage and remaining requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "status"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Calculates successful request usage within the active billing cycle and reports remaining quota. `remainingRequests` is null when unlimited.\n\n**Swagger:** `GET /api/v1/subscriptions/status`\n\n**operationId:** `SubscriptionsController_getStatus_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upgrade subscription plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/upgrade",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "upgrade"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Transitions the authenticated user to a higher-tier plan in a transaction and starts a new billing period.\n\n**Swagger:** `POST /api/v1/subscriptions/upgrade`\n\n**operationId:** `SubscriptionsController_upgrade_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"planSlug\": \"premium\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Providers",
+      "description": "Endpoints tagged `providers` from EchoGPT OpenAPI.",
+      "item": [
+        {
+          "name": "List active AI providers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/providers",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "providers"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Returns active system providers available for selection. System API keys are never exposed.\n\n**Swagger:** `GET /api/v1/providers`\n\n**operationId:** `ProvidersController_listActive_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List current user AI provider configurations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/providers/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "providers",
+                "me"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Returns the authenticated user provider credential metadata (masked key preview only; never raw keys).\n\n**Swagger:** `GET /api/v1/providers/me`\n\n**operationId:** `ProvidersController_listMine_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create or update user AI provider configuration",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/providers/me/:providerId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "providers",
+                "me",
+                ":providerId"
+              ],
+              "variable": [
+                {
+                  "key": "providerId",
+                  "value": "{{providerId}}",
+                  "description": "System AI provider UUID"
+                }
+              ],
+              "query": []
+            },
+            "description": "Stores an optional encrypted user API key and enable/default flags for a system provider.\n\n**Swagger:** `PUT /api/v1/providers/me/{providerId}`\n\n**operationId:** `ProvidersController_upsertMine_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"apiKey\": \"sk-your-user-provider-key\",\n  \"isEnabled\": true,\n  \"isDefault\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete user AI provider configuration",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/providers/me/:providerId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "providers",
+                "me",
+                ":providerId"
+              ],
+              "variable": [
+                {
+                  "key": "providerId",
+                  "value": "{{providerId}}",
+                  "description": "System AI provider UUID"
+                }
+              ],
+              "query": []
+            },
+            "description": "Removes the authenticated user configuration for the given system provider.\n\n**Swagger:** `DELETE /api/v1/providers/me/{providerId}`\n\n**operationId:** `ProvidersController_removeMine_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Set user default AI provider",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/providers/me/:providerId/default",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "providers",
+                "me",
+                ":providerId",
+                "default"
+              ],
+              "variable": [
+                {
+                  "key": "providerId",
+                  "value": "{{providerId}}",
+                  "description": "System AI provider UUID"
+                }
+              ],
+              "query": []
+            },
+            "description": "Marks the given user provider configuration as the user default.\n\n**Swagger:** `POST /api/v1/providers/me/{providerId}/default`\n\n**operationId:** `ProvidersController_setDefault_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "description": "Endpoints tagged `chat` from EchoGPT OpenAPI.",
+      "item": [
+        {
+          "name": "List current user conversations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations"
+              ],
+              "variable": [],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number for pagination (1-indexed) (optional)",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of items per page (max 100) (optional)",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns a paginated list of non-deleted conversations for the authenticated user.\n\n**Swagger:** `GET /api/v1/conversations`\n\n**operationId:** `ChatController_list_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create a conversation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/conversations",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Creates a new conversation owned by the authenticated user.\n\n**Swagger:** `POST /api/v1/conversations`\n\n**operationId:** `ChatController_create_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"My conversation\",\n  \"model\": \"gpt-4o-mini\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.id) pm.collectionVariables.set('conversationId', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get a conversation with recent messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{conversationId}}",
+                  "description": "Conversation UUID"
+                }
+              ],
+              "query": []
+            },
+            "description": "Returns conversation metadata and up to 200 recent messages.\n\n**Swagger:** `GET /api/v1/conversations/{id}`\n\n**operationId:** `ChatController_getOne_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update a conversation",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{conversationId}}",
+                  "description": "Conversation UUID"
+                }
+              ],
+              "query": []
+            },
+            "description": "Updates title, default provider, or model for an owned conversation.\n\n**Swagger:** `PATCH /api/v1/conversations/{id}`\n\n**operationId:** `ChatController_update_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated title\",\n  \"model\": \"gpt-4o-mini\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Soft-delete a conversation",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{conversationId}}",
+                  "description": "Conversation UUID"
+                }
+              ],
+              "query": []
+            },
+            "description": "Marks the conversation as deleted. Messages remain for audit but the conversation is hidden.\n\n**Swagger:** `DELETE /api/v1/conversations/{id}`\n\n**operationId:** `ChatController_remove_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List messages in a conversation",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/:id/messages?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                ":id",
+                "messages"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{conversationId}}",
+                  "description": "Conversation UUID"
+                }
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number for pagination (1-indexed) (optional)",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of items per page (max 100) (optional)",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns a paginated message history for an owned conversation.\n\n**Swagger:** `GET /api/v1/conversations/{id}/messages`\n\n**operationId:** `ChatController_listMessages_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send a chat message and receive an AI response",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/:id/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                ":id",
+                "messages"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{conversationId}}",
+                  "description": "Conversation UUID"
+                }
+              ],
+              "query": []
+            },
+            "description": "Validates ownership and subscription quota, resolves an AI provider, persists user/assistant messages, and records successful usage only.\n\n**Swagger:** `POST /api/v1/conversations/{id}/messages`\n\n**operationId:** `ChatController_sendMessage_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Explain NestJS modules in one paragraph.\",\n  \"model\": \"gpt-4o-mini\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send a chat message and stream the AI response (SSE)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/conversations/:id/messages/stream",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "conversations",
+                ":id",
+                "messages",
+                "stream"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{conversationId}}",
+                  "description": "Conversation UUID"
+                }
+              ],
+              "query": []
+            },
+            "description": "Streams the AI-generated response using Server-Sent Events.\n\nEvent types:\n- `chunk` \u2192 `{ \"text\": \"...\" }` partial assistant deltas\n- `done` \u2192 `{ \"userMessage\": {...}, \"assistantMessage\": {...} }` after successful persistence\n- `error` \u2192 `{ \"message\": \"...\", \"statusCode\": 502 }` on provider/stream failure\n\nFailed streams do not consume successful subscription quota. Client disconnect aborts the upstream provider stream.\nPre-stream failures (auth, ownership, quota, validation) may also be emitted as an SSE `error` event after headers are sent.\n\n**Swagger:** `POST /api/v1/conversations/{id}/messages/stream`\n\n**operationId:** `ChatController_streamMessage_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Stream a short hello message.\",\n  \"model\": \"gpt-4o-mini\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Web Search",
+      "description": "Endpoints tagged `search` from EchoGPT OpenAPI.",
+      "item": [
+        {
+          "name": "Perform a web search",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/web-search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web-search"
+              ],
+              "variable": [],
+              "query": []
+            },
+            "description": "Validates subscription quota, executes the configured search provider, persists history, and records successful usage only. Caching (when Redis is available) is an internal optimization and is not exposed to clients.\n\n**Swagger:** `POST /api/v1/web-search`\n\n**operationId:** `SearchController_search_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"NestJS dependency injection\",\n  \"limit\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.id) pm.collectionVariables.set('searchId', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List current user search history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/web-search/history?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web-search",
+                "history"
+              ],
+              "variable": [],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number for pagination (1-indexed) (optional)",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of items per page (max 100) (optional)",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns a paginated list of the authenticated user web search history.\n\n**Swagger:** `GET /api/v1/web-search/history`\n\n**operationId:** `SearchController_history_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List recent searches for the current user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/web-search/recent?limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web-search",
+                "recent"
+              ],
+              "variable": [],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Number of recent searches to return (optional)",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns the most recent search records for the authenticated user.\n\n**Swagger:** `GET /api/v1/web-search/recent`\n\n**operationId:** `SearchController_recent_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get search suggestions from the current user history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/web-search/suggestions?q=nest&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web-search",
+                "suggestions"
+              ],
+              "variable": [],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "nest",
+                  "description": "Optional prefix/term used to filter suggestions from the user search history (optional)",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Maximum number of suggestions to return (optional)",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns distinct previous queries for the authenticated user, optionally filtered by a prefix/term.\n\n**Swagger:** `GET /api/v1/web-search/suggestions`\n\n**operationId:** `SearchController_suggestions_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get a single search history record",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/web-search/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web-search",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{searchId}}",
+                  "description": "Web search record UUID"
+                }
+              ],
+              "query": []
+            },
+            "description": "Returns one owned web search history record by ID.\n\n**Swagger:** `GET /api/v1/web-search/{id}`\n\n**operationId:** `SearchController_getOne_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete a search history record",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/web-search/:id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "web-search",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{searchId}}",
+                  "description": "Web search record UUID"
+                }
+              ],
+              "query": []
+            },
+            "description": "Deletes an owned web search history record.\n\n**Swagger:** `DELETE /api/v1/web-search/{id}`\n\n**operationId:** `SearchController_remove_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "description": "ADMIN role required. Uses Bearer `{{accessToken}}` from an ADMIN login.",
+      "item": [
+        {
+          "name": "Dashboard & System",
+          "item": [
+            {
+              "name": "Admin dashboard statistics",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/dashboard",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "dashboard"
+                  ],
+                  "variable": [],
+                  "query": []
+                },
+                "description": "Returns nested aggregate statistics for users, subscriptions, providers, usage, chat, search, and system health.\n\n**Swagger:** `GET /api/v1/admin/dashboard`\n\n**operationId:** `AdminController_dashboard_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List API request logs",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/logs?page=1&limit=20&userId=string&provider=OPENAI&endpoint=/api/v1/conversations&method=GET&model=gpt-4o-mini&statusCode=200&requestId=string&from=2026-09-01T00:00:00.000Z&to=2026-09-24T23:59:59.000Z",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "logs"
+                  ],
+                  "variable": [],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "userId",
+                      "value": "string",
+                      "description": "Filter by user ID (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "provider",
+                      "value": "OPENAI",
+                      "description": "Filter by provider slug (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "endpoint",
+                      "value": "/api/v1/conversations",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "method",
+                      "value": "GET",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "model",
+                      "value": "gpt-4o-mini",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "statusCode",
+                      "value": "200",
+                      "description": "Filter by HTTP status code (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "requestId",
+                      "value": "string",
+                      "description": "Filter by request ID (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "from",
+                      "value": "2026-09-01T00:00:00.000Z",
+                      "description": "Inclusive start of log window (ISO 8601) (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "to",
+                      "value": "2026-09-24T23:59:59.000Z",
+                      "description": "Exclusive end of log window (ISO 8601) (optional)",
+                      "disabled": false
+                    }
+                  ]
+                },
+                "description": "Paginated APIUsageLog entries. Error messages are sanitized. Secrets are never returned.\n\n**Swagger:** `GET /api/v1/admin/logs`\n\n**operationId:** `AdminController_logs_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Admin system health",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/system/health",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "system",
+                    "health"
+                  ],
+                  "variable": [],
+                  "query": []
+                },
+                "description": "Database connectivity, uptime, version, and AI provider configuration status without secrets.\n\n**Swagger:** `GET /api/v1/admin/system/health`\n\n**operationId:** `AdminController_systemHealth_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Usage analytics",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/usage?from=2026-09-01T00:00:00.000Z&to=2026-09-24T23:59:59.000Z&userId=string&provider=OPENAI&endpoint=/api/v1/web-search&method=GET&statusCode=200&model=gpt-4o-mini",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "usage"
+                  ],
+                  "variable": [],
+                  "query": [
+                    {
+                      "key": "from",
+                      "value": "2026-09-01T00:00:00.000Z",
+                      "description": "Inclusive start of analytics window (ISO 8601) (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "to",
+                      "value": "2026-09-24T23:59:59.000Z",
+                      "description": "Exclusive end of analytics window (ISO 8601) (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "userId",
+                      "value": "string",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "provider",
+                      "value": "OPENAI",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "endpoint",
+                      "value": "/api/v1/web-search",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "method",
+                      "value": "GET",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "statusCode",
+                      "value": "200",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "model",
+                      "value": "gpt-4o-mini",
+                      "description": " (optional)",
+                      "disabled": false
+                    }
+                  ]
+                },
+                "description": "Aggregates APIUsageLog by provider, endpoint, status, and day with optional filters.\n\n**Swagger:** `GET /api/v1/admin/usage`\n\n**operationId:** `AdminController_usage_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Users",
+          "item": [
+            {
+              "name": "List users with search and filters",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/users?page=1&limit=20&role=USER&isActive=True&isEmailVerified=True&sortBy=createdAt&sortOrder=desc&createdFrom=string&createdTo=string",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "users"
+                  ],
+                  "variable": [],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "search",
+                      "value": "",
+                      "description": "Search by email, first name, or last name (optional)",
+                      "disabled": true
+                    },
+                    {
+                      "key": "role",
+                      "value": "USER",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "isActive",
+                      "value": "True",
+                      "description": "Filter by active status (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "isEmailVerified",
+                      "value": "True",
+                      "description": "Filter by email verification status (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "sortBy",
+                      "value": "createdAt",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "sortOrder",
+                      "value": "desc",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "createdFrom",
+                      "value": "string",
+                      "description": "Created at >= (ISO 8601) (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "createdTo",
+                      "value": "string",
+                      "description": "Created at < (ISO 8601) (optional)",
+                      "disabled": false
+                    }
+                  ]
+                },
+                "description": "Paginated admin user list with search, role, active, verification, and date filters. Never returns password or token hashes.\n\n**Swagger:** `GET /api/v1/admin/users`\n\n**operationId:** `AdminController_listUsers_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get user details for admin",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/users/:id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "users",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{userId}}",
+                      "description": "User UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Returns safe user details plus optional active subscription summary.\n\n**Swagger:** `GET /api/v1/admin/users/{id}`\n\n**operationId:** `AdminController_getUser_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Change user role",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/users/:id/role",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "users",
+                    ":id",
+                    "role"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{userId}}",
+                      "description": "User UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Assigns USER or ADMIN. Cannot demote the last active administrator or demote your own account.\n\n**Swagger:** `PATCH /api/v1/admin/users/{id}/role`\n\n**operationId:** `AdminController_updateUserRole_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"role\": \"USER\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Activate or deactivate a user",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/users/:id/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "users",
+                    ":id",
+                    "status"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{userId}}",
+                      "description": "User UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Updates isActive. Deactivation revokes refresh sessions. Cannot deactivate the last active administrator.\n\n**Swagger:** `PATCH /api/v1/admin/users/{id}/status`\n\n**operationId:** `AdminController_updateUserStatus_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"isActive\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get active subscription for a user",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/users/:id/subscription",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "users",
+                    ":id",
+                    "subscription"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{userId}}",
+                      "description": "User UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Returns the active subscription and plan summary for the given user.\n\n**Swagger:** `GET /api/v1/admin/users/{id}/subscription`\n\n**operationId:** `AdminController_getUserSubscription_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get usage summary for a user",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/users/:id/usage",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "users",
+                    ":id",
+                    "usage"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{userId}}",
+                      "description": "User UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Aggregates APIUsageLog totals and remaining requests for the user active billing period when available.\n\n**Swagger:** `GET /api/v1/admin/users/{id}/usage`\n\n**operationId:** `AdminController_getUserUsage_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Subscriptions",
+          "item": [
+            {
+              "name": "List all subscription plans (Admin only)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/subscription-plans",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "subscription-plans"
+                  ],
+                  "variable": [],
+                  "query": []
+                },
+                "description": "Retrieves all subscription plans, including inactive tiers.\n\n**Swagger:** `GET /api/v1/admin/subscription-plans`\n\n**operationId:** `AdminSubscriptionsController_getPlans_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create a new subscription plan (Admin only)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/subscription-plans",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "subscription-plans"
+                  ],
+                  "variable": [],
+                  "query": []
+                },
+                "description": "Creates a subscription plan with name, slug, price, and request limits.\n\n**Swagger:** `POST /api/v1/admin/subscription-plans`\n\n**operationId:** `AdminSubscriptionsController_createPlan_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"ENTERPRISE\",\n  \"slug\": \"enterprise\",\n  \"description\": \"Enterprise plan\",\n  \"price\": 99.99,\n  \"currency\": \"USD\",\n  \"billingCycle\": \"monthly\",\n  \"requestLimit\": 10000,\n  \"features\": {\n    \"prioritySupport\": true\n  },\n  \"isActive\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "List all user subscriptions with pagination (Admin only)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/subscriptions?page=1&limit=20&status=ACTIVE&planId=string&userId=string",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "subscriptions"
+                  ],
+                  "variable": [],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "1",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "limit",
+                      "value": "20",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "status",
+                      "value": "ACTIVE",
+                      "description": " (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "planId",
+                      "value": "string",
+                      "description": "Filter by plan ID (optional)",
+                      "disabled": false
+                    },
+                    {
+                      "key": "userId",
+                      "value": "string",
+                      "description": "Filter by user ID (optional)",
+                      "disabled": false
+                    }
+                  ]
+                },
+                "description": "Retrieves user subscriptions with optional filters by status, planId, and userId.\n\n**Swagger:** `GET /api/v1/admin/subscriptions`\n\n**operationId:** `AdminSubscriptionsController_getSubscriptions_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update subscription plan configuration (Admin only)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/subscription-plans/:id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "subscription-plans",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{planId}}",
+                      "description": "Subscription plan UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Modifies plan properties such as request limits, prices, and active state without corrupting existing subscriptions.\n\n**Swagger:** `PATCH /api/v1/admin/subscription-plans/{id}`\n\n**operationId:** `AdminSubscriptionsController_updatePlan_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"price\": 79.99,\n  \"requestLimit\": 15000,\n  \"isActive\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get subscription details (Admin only)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/subscriptions/:id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "subscriptions",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{subscriptionId}}",
+                      "description": "Subscription UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Returns a subscription with plan and safe user summary.\n\n**Swagger:** `GET /api/v1/admin/subscriptions/{id}`\n\n**operationId:** `AdminSubscriptionsController_getSubscription_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update subscription status (Admin only)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/subscriptions/:id/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "subscriptions",
+                    ":id",
+                    "status"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{subscriptionId}}",
+                      "description": "Subscription UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Changes lifecycle status of a subscription (e.g. PAST_DUE, EXPIRED, CANCELED).\n\n**Swagger:** `PATCH /api/v1/admin/subscriptions/{id}/status`\n\n**operationId:** `AdminSubscriptionsController_updateSubscriptionStatus_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"PAST_DUE\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "AI Providers",
+          "item": [
+            {
+              "name": "List AI providers (Admin only)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/ai-providers",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "ai-providers"
+                  ],
+                  "variable": [],
+                  "query": []
+                },
+                "description": "Returns all system AI providers including inactive ones. API keys are never exposed (masked preview only when present).\n\n**Swagger:** `GET /api/v1/admin/ai-providers`\n\n**operationId:** `AdminProvidersController_findAll_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Create AI provider (Admin only)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/ai-providers",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "ai-providers"
+                  ],
+                  "variable": [],
+                  "query": []
+                },
+                "description": "Creates a system AI provider. API keys are encrypted at rest and never returned in responses.\n\n**Swagger:** `POST /api/v1/admin/ai-providers`\n\n**operationId:** `AdminProvidersController_create_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Custom OpenAI\",\n  \"slug\": \"CUSTOM_OPENAI\",\n  \"description\": \"Custom OpenAI-compatible provider\",\n  \"baseUrl\": \"https://api.openai.com/v1\",\n  \"apiKey\": \"sk-xxxxxxxxxxxxxxxx\",\n  \"isActive\": true,\n  \"isDefault\": false\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete AI provider (Admin only)",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/ai-providers/:id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "ai-providers",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{providerId}}",
+                      "description": "AI provider UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Deletes a non-default provider. Prefer disable for temporary unavailability.\n\n**Swagger:** `DELETE /api/v1/admin/ai-providers/{id}`\n\n**operationId:** `AdminProvidersController_remove_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get AI provider details (Admin only)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/ai-providers/:id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "ai-providers",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{providerId}}",
+                      "description": "AI provider UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Returns provider metadata. Never includes the raw API key.\n\n**Swagger:** `GET /api/v1/admin/ai-providers/{id}`\n\n**operationId:** `AdminProvidersController_findOne_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update AI provider (Admin only)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/ai-providers/:id",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "ai-providers",
+                    ":id"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{providerId}}",
+                      "description": "AI provider UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Updates provider metadata and optionally replaces the encrypted API key.\n\n**Swagger:** `PATCH /api/v1/admin/ai-providers/{id}`\n\n**operationId:** `AdminProvidersController_update_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"description\": \"Updated description\",\n  \"isActive\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Set default AI provider (Admin only)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/ai-providers/:id/default",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "ai-providers",
+                    ":id",
+                    "default"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{providerId}}",
+                      "description": "AI provider UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Clears the previous default and marks this provider as the system default.\n\n**Swagger:** `POST /api/v1/admin/ai-providers/{id}/default`\n\n**operationId:** `AdminProvidersController_setDefault_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Run AI provider health check (Admin only)",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/ai-providers/:id/health-check",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "ai-providers",
+                    ":id",
+                    "health-check"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{providerId}}",
+                      "description": "AI provider UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Performs a lightweight connectivity/credential check. Never returns or logs the API key.\n\n**Swagger:** `POST /api/v1/admin/ai-providers/{id}/health-check`\n\n**operationId:** `AdminProvidersController_healthCheck_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Enable or disable AI provider (Admin only)",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/admin/ai-providers/:id/status",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "ai-providers",
+                    ":id",
+                    "status"
+                  ],
+                  "variable": [
+                    {
+                      "key": "id",
+                      "value": "{{providerId}}",
+                      "description": "AI provider UUID"
+                    }
+                  ],
+                  "query": []
+                },
+                "description": "Toggles provider availability. The system default provider cannot be deactivated.\n\n**Swagger:** `PATCH /api/v1/admin/ai-providers/{id}/status`\n\n**operationId:** `AdminProvidersController_setActive_v1`\n\n**Auth:** Bearer JWT (`{{accessToken}}`)",
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"isActive\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
