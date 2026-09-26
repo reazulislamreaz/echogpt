@@ -92,11 +92,19 @@ async function main(): Promise<void> {
     console.log(`✓ Subscription Plan seeded: ${createdPlan.name} (${createdPlan.slug})`);
   }
 
-  // Demo admin account for local/dev (placeholder password — change in production)
+  // Admin account — credentials come only from .env (never hardcoded)
+  const adminEmail = process.env.ADMIN_EMAIL?.trim();
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminEmail || !adminPassword) {
+    throw new Error(
+      'ADMIN_EMAIL and ADMIN_PASSWORD must be set in the environment (e.g. .env) before seeding the admin user',
+    );
+  }
+
   const adminRole = await prisma.role.findUnique({ where: { name: 'ADMIN' } });
   if (adminRole) {
-    const adminEmail = 'admin@echogpt.local';
-    const adminPasswordHash = await bcrypt.hash('AdminPassword123!', 10);
+    const saltRounds = Number(process.env.BCRYPT_SALT_ROUNDS) || 10;
+    const adminPasswordHash = await bcrypt.hash(adminPassword, saltRounds);
     const adminUser = await prisma.user.upsert({
       where: { email: adminEmail },
       update: {
