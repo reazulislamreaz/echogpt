@@ -263,14 +263,7 @@ Interactive OpenAPI docs include request/response schemas and a JWT **Authorize*
 
 ### Seeded demo admin
 
-After seeding:
-
-| Field | Value |
-| --- | --- |
-| Email | `admin@echogpt.local` |
-| Password | `AdminPassword123!` |
-
-Change this password outside local/dev environments. Seed also creates `USER` / `ADMIN` roles, `free` / `premium` plans, and OpenAI / Claude / Gemini provider records (without API keys).
+Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` (see `.env.example`), then run the seed. Login uses those exact credentials — they are never hardcoded in source. Seed also creates `USER` / `ADMIN` roles, `free` / `premium` plans, and OpenAI / Claude / Gemini provider records (without API keys).
 
 ## Environment variables
 
@@ -305,6 +298,8 @@ Copy `.env.example` → `.env`. Never commit `.env`.
 | `BCRYPT_SALT_ROUNDS` | `10` | bcrypt cost factor |
 | `EMAIL_VERIFICATION_EXPIRES_HOURS` | `24` | Verification token lifetime |
 | `REQUIRE_EMAIL_VERIFICATION` | `false` | When `true`, unverified users cannot log in |
+| `ADMIN_EMAIL` | — | Admin email for `prisma seed` (login uses this value) |
+| `ADMIN_PASSWORD` | — | Admin password for `prisma seed` (never commit real values) |
 
 ### SMTP (optional)
 
