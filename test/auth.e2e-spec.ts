@@ -95,24 +95,24 @@ describe('Authentication & Authorization (e2e)', () => {
         .expect(409);
     });
 
-    it('should reject invalid email format with 400 Bad Request', async () => {
+    it('should reject invalid email format with 422 Unprocessable Entity', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/auth/register')
         .send({
           email: 'invalid-email',
           password: testPassword,
         })
-        .expect(400);
+        .expect(422);
     });
 
-    it('should reject weak password with 400 Bad Request', async () => {
+    it('should reject weak password with 422 Unprocessable Entity', async () => {
       await request(app.getHttpServer())
         .post('/api/v1/auth/register')
         .send({
           email: `e2e_weak_${Date.now()}@example.com`,
           password: 'weak',
         })
-        .expect(400);
+        .expect(422);
     });
   });
 

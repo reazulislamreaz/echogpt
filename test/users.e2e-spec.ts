@@ -119,7 +119,7 @@ describe('User Management & Profile (e2e)', () => {
       expect(res.body.passwordHash).toBeUndefined();
     });
 
-    it('should reject unallowed security fields (email, roleId, isActive, passwordHash) with 400 Bad Request', async () => {
+    it('should reject unallowed security fields (email, roleId, isActive, passwordHash) with 422 Unprocessable Entity', async () => {
       await request(app.getHttpServer())
         .patch('/api/v1/users/me')
         .set('Authorization', `Bearer ${accessToken}`)
@@ -128,17 +128,17 @@ describe('User Management & Profile (e2e)', () => {
           roleId: 'f9382018-8472-4729-10ab-38472910ab38',
           isActive: false,
         })
-        .expect(400);
+        .expect(422);
     });
 
-    it('should reject invalid avatarUrl format with 400 Bad Request', async () => {
+    it('should reject invalid avatarUrl format with 422 Unprocessable Entity', async () => {
       await request(app.getHttpServer())
         .patch('/api/v1/users/me')
         .set('Authorization', `Bearer ${accessToken}`)
         .send({
           avatarUrl: 'not-a-valid-url',
         })
-        .expect(400);
+        .expect(422);
     });
 
     it('should reject unauthenticated request with 401 Unauthorized', async () => {
@@ -161,7 +161,7 @@ describe('User Management & Profile (e2e)', () => {
         .expect(400);
     });
 
-    it('should reject weak new password with 400 Bad Request', async () => {
+    it('should reject weak new password with 422 Unprocessable Entity', async () => {
       await request(app.getHttpServer())
         .patch('/api/v1/users/me/password')
         .set('Authorization', `Bearer ${accessToken}`)
@@ -169,7 +169,7 @@ describe('User Management & Profile (e2e)', () => {
           currentPassword: initialPassword,
           newPassword: 'weak',
         })
-        .expect(400);
+        .expect(422);
     });
 
     it('should reject new password identical to current password with 400 Bad Request', async () => {

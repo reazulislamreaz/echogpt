@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpCode,
+  HttpException,
   HttpStatus,
   Param,
   ParseUUIDPipe,
@@ -30,11 +31,13 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import {
+  ApiAuthErrors,
+  ApiStandardBadGateway,
   ApiStandardBadRequest,
   ApiStandardForbidden,
+  ApiStandardGatewayTimeout,
   ApiStandardNotFound,
-  ApiStandardTooManyRequests,
-  ApiStandardUnauthorized,
+  ApiStandardUnprocessable,
 } from '../common/swagger/api-error-responses';
 import { SubscriptionUsageGuard } from '../subscriptions/guards/subscription-usage.guard';
 import { ChatService } from './chat.service';
@@ -72,9 +75,8 @@ export class ChatController {
     description: 'Creates a new conversation owned by the authenticated user.',
   })
   @ApiCreatedResponse({ type: ConversationResponseDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardBadRequest()
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAuthErrors()
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateConversationDto,
@@ -89,8 +91,8 @@ export class ChatController {
       'Returns a paginated list of non-deleted conversations for the authenticated user.',
   })
   @ApiOkResponse({ type: PaginatedConversationsDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAuthErrors()
   async list(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: PaginationQueryDto,
@@ -105,10 +107,10 @@ export class ChatController {
   })
   @ApiParam({ name: 'id', description: 'Conversation UUID' })
   @ApiOkResponse({ type: ConversationDetailResponseDto })
+  @ApiStandardBadRequest('Invalid conversation UUID')
   @ApiStandardNotFound()
-  @ApiStandardForbidden()
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiStandardForbidden('Ownership violation')
+  @ApiAuthErrors()
   async getOne(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -123,11 +125,11 @@ export class ChatController {
   })
   @ApiParam({ name: 'id', description: 'Conversation UUID' })
   @ApiOkResponse({ type: ConversationResponseDto })
-  @ApiStandardBadRequest()
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Invalid conversation UUID or inactive provider')
   @ApiStandardNotFound()
-  @ApiStandardForbidden()
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiStandardForbidden('Ownership violation')
+  @ApiAuthErrors()
   async update(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -145,10 +147,10 @@ export class ChatController {
   })
   @ApiParam({ name: 'id', description: 'Conversation UUID' })
   @ApiOkResponse({ type: ConversationDeletedResponseDto })
+  @ApiStandardBadRequest('Invalid conversation UUID')
   @ApiStandardNotFound()
-  @ApiStandardForbidden()
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiStandardForbidden('Ownership violation')
+  @ApiAuthErrors()
   async remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -163,10 +165,11 @@ export class ChatController {
   })
   @ApiParam({ name: 'id', description: 'Conversation UUID' })
   @ApiOkResponse({ type: PaginatedMessagesDto })
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Invalid conversation UUID')
   @ApiStandardNotFound()
-  @ApiStandardForbidden()
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiStandardForbidden('Ownership violation')
+  @ApiAuthErrors()
   async listMessages(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -185,11 +188,13 @@ export class ChatController {
   })
   @ApiParam({ name: 'id', description: 'Conversation UUID' })
   @ApiOkResponse({ type: SendMessageResponseDto })
-  @ApiStandardBadRequest()
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Invalid UUID, inactive provider, or invalid request')
   @ApiStandardNotFound()
-  @ApiStandardForbidden()
-  @ApiStandardTooManyRequests()
-  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('Ownership violation')
+  @ApiStandardBadGateway('AI provider request failed')
+  @ApiStandardGatewayTimeout('AI provider request timed out')
+  @ApiAuthErrors()
   async sendMessage(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -220,6 +225,7 @@ export class ChatController {
       '- `error` → `{ "message": "...", "statusCode": 502 }` on provider/stream failure',
       '',
       'Failed streams do not consume successful subscription quota. Client disconnect aborts the upstream provider stream.',
+      'Pre-stream failures (auth, ownership, quota, validation) may also be emitted as an SSE `error` event after headers are sent.',
     ].join('\n'),
   })
   @ApiParam({ name: 'id', description: 'Conversation UUID' })
@@ -232,11 +238,13 @@ export class ChatController {
         'event: chunk\ndata: {"text":"Hello "}\n\nevent: done\ndata: {"userMessage":{"id":"..."},"assistantMessage":{"id":"..."}}\n\n',
     },
   })
-  @ApiStandardBadRequest()
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Invalid UUID, inactive provider, or invalid request')
   @ApiStandardNotFound()
-  @ApiStandardForbidden()
-  @ApiStandardTooManyRequests()
-  @ApiStandardUnauthorized()
+  @ApiStandardForbidden('Ownership violation')
+  @ApiStandardBadGateway('AI provider request failed')
+  @ApiStandardGatewayTimeout('AI provider request timed out')
+  @ApiAuthErrors()
   async streamMessage(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -268,8 +276,8 @@ export class ChatController {
       }
     } catch (error) {
       if (!res.writableEnded && !abort.signal.aborted) {
-        const message = error instanceof Error ? error.message : 'Streaming chat request failed';
-        res.write(`event: error\ndata: ${JSON.stringify({ message, statusCode: 500 })}\n\n`);
+        const { message, statusCode } = this.normalizeStreamError(error);
+        res.write(`event: error\ndata: ${JSON.stringify({ message, statusCode })}\n\n`);
       }
     } finally {
       req.off('close', onClose);
@@ -277,5 +285,25 @@ export class ChatController {
         res.end();
       }
     }
+  }
+
+  private normalizeStreamError(error: unknown): { message: string; statusCode: number } {
+    if (error instanceof HttpException) {
+      const statusCode = error.getStatus();
+      const response = error.getResponse();
+      if (typeof response === 'string') {
+        return { message: response, statusCode };
+      }
+      const message = (response as { message?: string | string[] }).message ?? error.message;
+      return {
+        message: Array.isArray(message) ? message.join('; ') : message,
+        statusCode,
+      };
+    }
+
+    return {
+      message: 'Streaming chat request failed',
+      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+    };
   }
 }

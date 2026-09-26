@@ -28,6 +28,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       path: request.url,
     };
 
+    const requestId = this.extractRequestId(request);
+    if (requestId) {
+      body.requestId = requestId;
+    }
+
     if (statusCode >= Number(HttpStatus.INTERNAL_SERVER_ERROR)) {
       this.logger.error(
         `${request.method} ${request.url}`,
@@ -38,6 +43,23 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     response.status(statusCode).json(body);
+  }
+
+  private extractRequestId(request: Request): string | undefined {
+    const header =
+      request.headers['x-request-id'] ??
+      request.headers['x-correlation-id'] ??
+      request.headers['x-amzn-trace-id'];
+
+    if (typeof header === 'string' && header.trim()) {
+      return header.trim().slice(0, 128);
+    }
+
+    if (Array.isArray(header) && header[0]?.trim()) {
+      return header[0].trim().slice(0, 128);
+    }
+
+    return undefined;
   }
 
   private normalizeException(exception: unknown): {
@@ -53,22 +75,43 @@ export class AllExceptionsFilter implements ExceptionFilter {
         return {
           statusCode,
           message: exceptionResponse,
-          error: exception.name,
+          error: this.defaultErrorName(statusCode, exception.name),
         };
       }
 
       const responseObject = exceptionResponse as Record<string, unknown>;
       const message = (responseObject.message as string | string[]) ?? exception.message;
       const error =
-        typeof responseObject.error === 'string' ? responseObject.error : exception.name;
+        typeof responseObject.error === 'string'
+          ? responseObject.error
+          : this.defaultErrorName(statusCode, exception.name);
 
       return { statusCode, message, error };
     }
 
+    // Never leak Prisma/SQL/stack details to clients
     return {
       statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
       message: 'Internal server error',
       error: 'Internal Server Error',
     };
+  }
+
+  private defaultErrorName(statusCode: number, fallback: string): string {
+    const names: Record<number, string> = {
+      [HttpStatus.BAD_REQUEST]: 'Bad Request',
+      [HttpStatus.UNAUTHORIZED]: 'Unauthorized',
+      [HttpStatus.FORBIDDEN]: 'Forbidden',
+      [HttpStatus.NOT_FOUND]: 'Not Found',
+      [HttpStatus.CONFLICT]: 'Conflict',
+      [HttpStatus.UNPROCESSABLE_ENTITY]: 'Unprocessable Entity',
+      [HttpStatus.TOO_MANY_REQUESTS]: 'Too Many Requests',
+      [HttpStatus.BAD_GATEWAY]: 'Bad Gateway',
+      [HttpStatus.SERVICE_UNAVAILABLE]: 'Service Unavailable',
+      [HttpStatus.GATEWAY_TIMEOUT]: 'Gateway Timeout',
+      [HttpStatus.INTERNAL_SERVER_ERROR]: 'Internal Server Error',
+    };
+
+    return names[statusCode] ?? fallback;
   }
 }

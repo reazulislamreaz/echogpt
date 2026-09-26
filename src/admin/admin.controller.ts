@@ -13,12 +13,11 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import {
+  ApiAdminErrors,
   ApiStandardBadRequest,
   ApiStandardConflict,
-  ApiStandardForbidden,
   ApiStandardNotFound,
-  ApiStandardTooManyRequests,
-  ApiStandardUnauthorized,
+  ApiStandardUnprocessable,
 } from '../common/swagger/api-error-responses';
 import { Roles } from '../roles/decorators/roles.decorator';
 import { RoleType } from '../roles/enums/role.enum';
@@ -57,9 +56,7 @@ export class AdminController {
       'Returns nested aggregate statistics for users, subscriptions, providers, usage, chat, search, and system health.',
   })
   @ApiOkResponse({ type: AdminDashboardStatsDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async dashboard(): Promise<AdminDashboardStatsDto> {
     return this.adminService.getDashboardStats();
   }
@@ -71,9 +68,8 @@ export class AdminController {
       'Paginated admin user list with search, role, active, verification, and date filters. Never returns password or token hashes.',
   })
   @ApiOkResponse({ type: PaginatedAdminUsersDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAdminErrors()
   async listUsers(@Query() query: AdminUserQueryDto): Promise<PaginatedAdminUsersDto> {
     return this.adminService.listUsers(query);
   }
@@ -85,10 +81,9 @@ export class AdminController {
   })
   @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiOkResponse({ type: AdminUserDetailDto })
+  @ApiStandardBadRequest('Invalid user UUID')
   @ApiStandardNotFound('User not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async getUser(@Param('id', ParseUUIDPipe) id: string): Promise<AdminUserDetailDto> {
     return this.adminService.getUserDetail(id);
   }
@@ -101,12 +96,11 @@ export class AdminController {
   })
   @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiOkResponse({ type: UserResponseDto })
-  @ApiStandardBadRequest()
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Invalid user UUID')
   @ApiStandardNotFound('User not found')
   @ApiStandardConflict('Would remove the last active administrator')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async updateUserStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AdminUpdateUserStatusDto,
@@ -122,12 +116,11 @@ export class AdminController {
   })
   @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiOkResponse({ type: UserResponseDto })
-  @ApiStandardBadRequest('Invalid role')
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Invalid user UUID or role not configured')
   @ApiStandardNotFound('User not found')
   @ApiStandardConflict('Last-admin or self-demotion protection')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async updateUserRole(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -143,10 +136,9 @@ export class AdminController {
   })
   @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiOkResponse({ type: AdminUserSubscriptionDto })
+  @ApiStandardBadRequest('Invalid user UUID')
   @ApiStandardNotFound('User or active subscription not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async getUserSubscription(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<AdminUserSubscriptionDto> {
@@ -161,10 +153,9 @@ export class AdminController {
   })
   @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiOkResponse({ type: AdminUserUsageSummaryDto })
+  @ApiStandardBadRequest('Invalid user UUID')
   @ApiStandardNotFound('User not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async getUserUsage(@Param('id', ParseUUIDPipe) id: string): Promise<AdminUserUsageSummaryDto> {
     return this.adminService.getUserUsageSummary(id);
   }
@@ -176,9 +167,8 @@ export class AdminController {
       'Aggregates APIUsageLog by provider, endpoint, status, and day with optional filters.',
   })
   @ApiOkResponse({ type: AdminUsageAnalyticsDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAdminErrors()
   async usage(@Query() query: AdminUsageAnalyticsQueryDto): Promise<AdminUsageAnalyticsDto> {
     return this.adminService.getUsageAnalytics(query);
   }
@@ -190,9 +180,8 @@ export class AdminController {
       'Paginated APIUsageLog entries. Error messages are sanitized. Secrets are never returned.',
   })
   @ApiOkResponse({ type: PaginatedAdminUsageLogsDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAdminErrors()
   async logs(@Query() query: AdminUsageLogsQueryDto): Promise<PaginatedAdminUsageLogsDto> {
     return this.adminService.getUsageLogs(query);
   }
@@ -204,9 +193,7 @@ export class AdminController {
       'Database connectivity, uptime, version, and AI provider configuration status without secrets.',
   })
   @ApiOkResponse({ type: AdminSystemHealthDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async systemHealth(): Promise<AdminSystemHealthDto> {
     return this.adminService.getSystemHealth();
   }

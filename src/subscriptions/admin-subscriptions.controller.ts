@@ -25,12 +25,11 @@ import {
   PaginatedAdminSubscriptionsDto,
 } from '../admin/dto/admin-subscription-response.dto';
 import {
-  ApiStandardConflict,
-  ApiStandardForbidden,
-  ApiStandardNotFound,
-  ApiStandardTooManyRequests,
-  ApiStandardUnauthorized,
+  ApiAdminErrors,
   ApiStandardBadRequest,
+  ApiStandardConflict,
+  ApiStandardNotFound,
+  ApiStandardUnprocessable,
 } from '../common/swagger/api-error-responses';
 import { Roles } from '../roles/decorators/roles.decorator';
 import { RoleType } from '../roles/enums/role.enum';
@@ -56,9 +55,7 @@ export class AdminSubscriptionsController {
     description: 'Retrieves all subscription plans, including inactive tiers.',
   })
   @ApiOkResponse({ type: [PlanResponseDto] })
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async getPlans(): Promise<PlanResponseDto[]> {
     return this.subscriptionsService.getAllPlans();
   }
@@ -70,11 +67,9 @@ export class AdminSubscriptionsController {
     description: 'Creates a subscription plan with name, slug, price, and request limits.',
   })
   @ApiCreatedResponse({ type: PlanResponseDto })
-  @ApiStandardBadRequest()
+  @ApiStandardUnprocessable()
   @ApiStandardConflict('Plan name or slug already in use')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async createPlan(@Body() dto: AdminCreatePlanDto): Promise<PlanResponseDto> {
     return this.subscriptionsService.adminCreatePlan(dto);
   }
@@ -87,11 +82,10 @@ export class AdminSubscriptionsController {
   })
   @ApiParam({ name: 'id', description: 'Subscription plan UUID' })
   @ApiOkResponse({ type: PlanResponseDto })
-  @ApiStandardBadRequest()
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Invalid plan UUID')
   @ApiStandardNotFound('Subscription plan not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async updatePlan(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AdminUpdatePlanDto,
@@ -106,9 +100,8 @@ export class AdminSubscriptionsController {
       'Retrieves user subscriptions with optional filters by status, planId, and userId.',
   })
   @ApiOkResponse({ type: PaginatedAdminSubscriptionsDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAdminErrors()
   async getSubscriptions(
     @Query() query: AdminSubscriptionQueryDto,
   ): Promise<PaginatedAdminSubscriptionsDto> {
@@ -126,10 +119,9 @@ export class AdminSubscriptionsController {
   })
   @ApiParam({ name: 'id', description: 'Subscription UUID' })
   @ApiOkResponse({ type: AdminSubscriptionDetailDto })
+  @ApiStandardBadRequest('Invalid subscription UUID')
   @ApiStandardNotFound('Subscription not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async getSubscription(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<AdminSubscriptionDetailDto> {
@@ -143,11 +135,10 @@ export class AdminSubscriptionsController {
   })
   @ApiParam({ name: 'id', description: 'Subscription UUID' })
   @ApiOkResponse({ type: SubscriptionResponseDto })
-  @ApiStandardBadRequest()
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Invalid subscription UUID')
   @ApiStandardNotFound('Subscription not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async updateSubscriptionStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AdminUpdateSubscriptionStatusDto,

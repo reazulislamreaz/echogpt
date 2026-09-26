@@ -22,12 +22,11 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MessageResponseDto } from '../common/dto/message-response.dto';
 import {
+  ApiAdminErrors,
   ApiStandardBadRequest,
   ApiStandardConflict,
-  ApiStandardForbidden,
   ApiStandardNotFound,
-  ApiStandardTooManyRequests,
-  ApiStandardUnauthorized,
+  ApiStandardUnprocessable,
 } from '../common/swagger/api-error-responses';
 import { Roles } from '../roles/decorators/roles.decorator';
 import { RoleType } from '../roles/enums/role.enum';
@@ -55,11 +54,10 @@ export class AdminProvidersController {
       'Creates a system AI provider. API keys are encrypted at rest and never returned in responses.',
   })
   @ApiCreatedResponse({ type: ProviderResponseDto })
-  @ApiStandardBadRequest()
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Cannot set an inactive provider as default')
   @ApiStandardConflict('Provider slug already exists')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async create(@Body() dto: CreateProviderDto): Promise<ProviderResponseDto> {
     return this.providersService.createProvider(dto);
   }
@@ -71,9 +69,7 @@ export class AdminProvidersController {
       'Returns all system AI providers including inactive ones. API keys are never exposed (masked preview only when present).',
   })
   @ApiOkResponse({ type: [ProviderResponseDto] })
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async findAll(): Promise<ProviderResponseDto[]> {
     return this.providersService.listProviders(true);
   }
@@ -85,10 +81,9 @@ export class AdminProvidersController {
   })
   @ApiParam({ name: 'id', description: 'AI provider UUID' })
   @ApiOkResponse({ type: ProviderResponseDto })
+  @ApiStandardBadRequest('Invalid provider UUID')
   @ApiStandardNotFound('Provider not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<ProviderResponseDto> {
     return this.providersService.getProviderById(id);
   }
@@ -100,11 +95,11 @@ export class AdminProvidersController {
   })
   @ApiParam({ name: 'id', description: 'AI provider UUID' })
   @ApiOkResponse({ type: ProviderResponseDto })
-  @ApiStandardBadRequest()
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Invalid UUID or invalid provider state')
   @ApiStandardNotFound('Provider not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiStandardConflict('Provider slug already exists')
+  @ApiAdminErrors()
   async update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateProviderDto,
@@ -120,11 +115,10 @@ export class AdminProvidersController {
   })
   @ApiParam({ name: 'id', description: 'AI provider UUID' })
   @ApiOkResponse({ type: ProviderResponseDto })
-  @ApiStandardBadRequest('Cannot deactivate the default provider')
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Cannot deactivate the default provider or invalid UUID')
   @ApiStandardNotFound('Provider not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async setActive(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: SetProviderActiveDto,
@@ -140,11 +134,9 @@ export class AdminProvidersController {
   })
   @ApiParam({ name: 'id', description: 'AI provider UUID' })
   @ApiOkResponse({ type: ProviderResponseDto })
-  @ApiStandardBadRequest('Provider is inactive')
+  @ApiStandardBadRequest('Provider is inactive or invalid UUID')
   @ApiStandardNotFound('Provider not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async setDefault(@Param('id', ParseUUIDPipe) id: string): Promise<ProviderResponseDto> {
     return this.providersService.setDefaultProvider(id);
   }
@@ -158,10 +150,9 @@ export class AdminProvidersController {
   })
   @ApiParam({ name: 'id', description: 'AI provider UUID' })
   @ApiOkResponse({ type: ProviderHealthCheckResponseDto })
+  @ApiStandardBadRequest('Invalid provider UUID')
   @ApiStandardNotFound('Provider not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async healthCheck(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ProviderHealthCheckResponseDto> {
@@ -176,11 +167,9 @@ export class AdminProvidersController {
   })
   @ApiParam({ name: 'id', description: 'AI provider UUID' })
   @ApiOkResponse({ type: MessageResponseDto })
-  @ApiStandardBadRequest('Cannot delete the default provider')
+  @ApiStandardBadRequest('Cannot delete the default provider or invalid UUID')
   @ApiStandardNotFound('Provider not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<MessageResponseDto> {
     return this.providersService.deleteProvider(id);
   }

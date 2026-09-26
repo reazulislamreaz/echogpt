@@ -81,12 +81,12 @@ describe('Web Search (e2e)', () => {
     await request(app.getHttpServer()).get('/api/v1/web-search/history').expect(401);
   });
 
-  it('rejects empty search query with 400', async () => {
+  it('rejects empty search query with 422', async () => {
     await request(app.getHttpServer())
       .post('/api/v1/web-search')
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ query: '   ' })
-      .expect(400);
+      .expect(422);
   });
 
   it('performs a search, persists history, and does not expose secrets', async () => {
