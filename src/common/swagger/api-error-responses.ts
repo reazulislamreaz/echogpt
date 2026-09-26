@@ -1,13 +1,16 @@
 import { applyDecorators, Type } from '@nestjs/common';
 import {
+  ApiBadGatewayResponse,
   ApiBadRequestResponse,
   ApiConflictResponse,
   ApiForbiddenResponse,
+  ApiGatewayTimeoutResponse,
   ApiInternalServerErrorResponse,
   ApiNotFoundResponse,
   ApiServiceUnavailableResponse,
   ApiTooManyRequestsResponse,
   ApiUnauthorizedResponse,
+  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import { ApiErrorResponseDto } from '../dto/api-error-response.dto';
 
@@ -20,7 +23,7 @@ const withErrorSchema =
 
 export const ApiStandardBadRequest = withErrorSchema(
   ApiBadRequestResponse,
-  'Validation failed or malformed request',
+  'Malformed request, invalid path parameter, or business-rule rejection',
 );
 
 export const ApiStandardUnauthorized = withErrorSchema(
@@ -40,6 +43,11 @@ export const ApiStandardConflict = withErrorSchema(
   'Request conflicts with current state',
 );
 
+export const ApiStandardUnprocessable = withErrorSchema(
+  ApiUnprocessableEntityResponse,
+  'Request body or query failed validation',
+);
+
 export const ApiStandardTooManyRequests = withErrorSchema(
   ApiTooManyRequestsResponse,
   'HTTP rate limit or subscription usage limit exceeded',
@@ -50,16 +58,48 @@ export const ApiStandardServiceUnavailable = withErrorSchema(
   'Required dependency temporarily unavailable',
 );
 
+export const ApiStandardBadGateway = withErrorSchema(
+  ApiBadGatewayResponse,
+  'Upstream provider request failed',
+);
+
+export const ApiStandardGatewayTimeout = withErrorSchema(
+  ApiGatewayTimeoutResponse,
+  'Upstream provider request timed out',
+);
+
 export const ApiStandardInternalError = withErrorSchema(
   ApiInternalServerErrorResponse,
   'Unexpected server error',
 );
 
-/** Common auth-protected endpoint errors including global throttling. */
-export function ApiProtectedErrors(): MethodDecorator {
+/** Public (unauthenticated) endpoints: throttle + unexpected errors. */
+export function ApiPublicErrors(): MethodDecorator {
+  return applyDecorators(ApiStandardTooManyRequests(), ApiStandardInternalError());
+}
+
+/** JWT-authenticated endpoints: auth + throttle + unexpected errors. */
+export function ApiAuthErrors(): MethodDecorator {
   return applyDecorators(
     ApiStandardUnauthorized(),
     ApiStandardTooManyRequests(),
     ApiStandardInternalError(),
   );
+}
+
+/** ADMIN RBAC endpoints: auth + forbidden + throttle + unexpected errors. */
+export function ApiAdminErrors(): MethodDecorator {
+  return applyDecorators(
+    ApiStandardUnauthorized(),
+    ApiStandardForbidden('ADMIN role required'),
+    ApiStandardTooManyRequests(),
+    ApiStandardInternalError(),
+  );
+}
+
+/**
+ * @deprecated Prefer ApiAuthErrors — kept for call-site compatibility.
+ */
+export function ApiProtectedErrors(): MethodDecorator {
+  return ApiAuthErrors();
 }

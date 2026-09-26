@@ -1,5 +1,6 @@
 import { Controller, Get, HttpCode, HttpStatus, Res } from '@nestjs/common';
 import {
+  ApiInternalServerErrorResponse,
   ApiOkResponse,
   ApiOperation,
   ApiServiceUnavailableResponse,
@@ -33,6 +34,10 @@ export class HealthController {
   })
   @ApiTooManyRequestsResponse({
     description: 'HTTP rate limit exceeded',
+    type: ApiErrorResponseDto,
+  })
+  @ApiInternalServerErrorResponse({
+    description: 'Unexpected server error',
     type: ApiErrorResponseDto,
   })
   async check(@Res({ passthrough: true }) res: Response): Promise<HealthCheckResponseDto> {

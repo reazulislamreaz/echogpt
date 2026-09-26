@@ -504,9 +504,28 @@ Redis caching is an internal optimization and is not required by clients.
 - AI provider keys encrypted at rest (`ENCRYPTION_KEY` → AES-256-GCM)
 - Ownership checks on conversations, messages, and search history
 - Admin routes require server-side `RolesGuard`
-- Global validation rejects unknown body fields
+- Global validation rejects unknown body fields (**422** Unprocessable Entity)
+- Business-rule rejections and invalid path UUIDs use **400** Bad Request
+- Unexpected failures return a sanitized **500** envelope (no Prisma/SQL/stack leakage)
 - Custom security response headers applied at bootstrap
 - Secrets must not appear in Swagger examples, logs, or Git (use `.env.example` placeholders only)
+
+### Error response envelope
+
+All HTTP errors (except SSE `error` events on streaming chat) use:
+
+```json
+{
+  "statusCode": 401,
+  "message": "Unauthorized",
+  "error": "Unauthorized",
+  "timestamp": "2026-09-26T10:00:00.000Z",
+  "path": "/api/v1/auth/login",
+  "requestId": "optional-when-x-request-id-is-sent"
+}
+```
+
+`message` may be a string or a string array (validation). Applicable status codes include 400, 401, 403, 404, 409, 422, 429, 500, 502, 503, and 504 depending on the endpoint.
 
 ## Testing
 

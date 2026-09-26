@@ -17,11 +17,11 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import { MessageResponseDto } from '../common/dto/message-response.dto';
 import {
+  ApiAuthErrors,
   ApiStandardBadRequest,
   ApiStandardForbidden,
   ApiStandardNotFound,
-  ApiStandardTooManyRequests,
-  ApiStandardUnauthorized,
+  ApiStandardUnprocessable,
 } from '../common/swagger/api-error-responses';
 import { ProviderResponseDto } from './dto/provider-response.dto';
 import { UpsertUserProviderDto } from './dto/upsert-user-provider.dto';
@@ -42,8 +42,7 @@ export class ProvidersController {
       'Returns active system providers available for selection. System API keys are never exposed.',
   })
   @ApiOkResponse({ type: [ProviderResponseDto] })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async listActive(): Promise<ProviderResponseDto[]> {
     return this.providersService.listActiveProvidersForUsers();
   }
@@ -55,8 +54,7 @@ export class ProvidersController {
       'Returns the authenticated user provider credential metadata (masked key preview only; never raw keys).',
   })
   @ApiOkResponse({ type: [UserProviderResponseDto] })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async listMine(@CurrentUser() user: AuthenticatedUser): Promise<UserProviderResponseDto[]> {
     return this.providersService.listUserProviders(user.id);
   }
@@ -69,10 +67,10 @@ export class ProvidersController {
   })
   @ApiParam({ name: 'providerId', description: 'System AI provider UUID' })
   @ApiOkResponse({ type: UserProviderResponseDto })
-  @ApiStandardBadRequest('Inactive provider or invalid configuration')
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Inactive provider, invalid UUID, or invalid configuration')
   @ApiStandardNotFound('System provider not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async upsertMine(
     @CurrentUser() user: AuthenticatedUser,
     @Param('providerId', ParseUUIDPipe) providerId: string,
@@ -89,10 +87,9 @@ export class ProvidersController {
   })
   @ApiParam({ name: 'providerId', description: 'System AI provider UUID' })
   @ApiOkResponse({ type: UserProviderResponseDto })
-  @ApiStandardBadRequest('Provider disabled or inactive')
+  @ApiStandardBadRequest('Provider disabled, inactive, or invalid UUID')
   @ApiStandardNotFound('User provider configuration not found')
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async setDefault(
     @CurrentUser() user: AuthenticatedUser,
     @Param('providerId', ParseUUIDPipe) providerId: string,
@@ -108,10 +105,10 @@ export class ProvidersController {
   })
   @ApiParam({ name: 'providerId', description: 'System AI provider UUID' })
   @ApiOkResponse({ type: MessageResponseDto })
+  @ApiStandardBadRequest('Invalid provider UUID')
   @ApiStandardNotFound('User provider configuration not found')
   @ApiStandardForbidden('Ownership violation')
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async removeMine(
     @CurrentUser() user: AuthenticatedUser,
     @Param('providerId', ParseUUIDPipe) providerId: string,

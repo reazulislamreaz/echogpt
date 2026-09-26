@@ -15,11 +15,11 @@ import {
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import {
+  ApiAdminErrors,
+  ApiAuthErrors,
   ApiStandardBadRequest,
-  ApiStandardForbidden,
   ApiStandardNotFound,
-  ApiStandardTooManyRequests,
-  ApiStandardUnauthorized,
+  ApiStandardUnprocessable,
 } from '../common/swagger/api-error-responses';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -48,8 +48,7 @@ export class UsersController {
       'Returns the authenticated user profile without passwords, token hashes, or other internal security fields.',
   })
   @ApiOkResponse({ type: UserResponseDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async getProfile(@CurrentUser() user: AuthenticatedUser): Promise<UserResponseDto> {
     return this.usersService.getCurrentUserProfile(user.id);
   }
@@ -61,9 +60,8 @@ export class UsersController {
       'Updates firstName, lastName, and avatarUrl. Identity fields (id, email, password, role) cannot be changed here.',
   })
   @ApiOkResponse({ type: UserResponseDto })
-  @ApiStandardBadRequest()
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAuthErrors()
   async updateProfile(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateProfileDto,
@@ -79,9 +77,9 @@ export class UsersController {
       'Verifies the current password, hashes the new password, updates the account, and revokes active refresh sessions.',
   })
   @ApiOkResponse({ type: UserMessageResponseDto })
-  @ApiStandardBadRequest('Current password incorrect, invalid new password, or same as current')
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('Current password incorrect or new password same as current')
+  @ApiAuthErrors()
   async changePassword(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: ChangePasswordDto,
@@ -97,8 +95,7 @@ export class UsersController {
       'Deactivates the account and revokes active sessions while preserving historical records.',
   })
   @ApiOkResponse({ type: UserMessageResponseDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async deleteAccount(@CurrentUser() user: AuthenticatedUser): Promise<UserMessageResponseDto> {
     return this.usersService.softDeleteAccount(user.id);
   }
@@ -112,9 +109,8 @@ export class UsersController {
       'Returns a paginated list of registered users in safe representation. Requires ADMIN role.',
   })
   @ApiOkResponse({ type: PaginatedUsersDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAdminErrors()
   async findAll(@Query() query: PaginationQueryDto): Promise<PaginatedUsersDto> {
     return this.usersService.findAll(query.page, query.limit);
   }
@@ -128,10 +124,9 @@ export class UsersController {
   })
   @ApiParam({ name: 'id', description: 'User UUID' })
   @ApiOkResponse({ type: UserResponseDto })
+  @ApiStandardBadRequest('Invalid user UUID')
   @ApiStandardNotFound()
-  @ApiStandardUnauthorized()
-  @ApiStandardForbidden('ADMIN role required')
-  @ApiStandardTooManyRequests()
+  @ApiAdminErrors()
   async findOne(@Param('id', ParseUUIDPipe) id: string): Promise<UserResponseDto> {
     const user = await this.usersService.findById(id);
     if (!user) {

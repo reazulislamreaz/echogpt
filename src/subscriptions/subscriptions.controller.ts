@@ -4,11 +4,12 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interface';
 import {
+  ApiAuthErrors,
+  ApiPublicErrors,
   ApiStandardBadRequest,
   ApiStandardConflict,
   ApiStandardNotFound,
-  ApiStandardTooManyRequests,
-  ApiStandardUnauthorized,
+  ApiStandardUnprocessable,
 } from '../common/swagger/api-error-responses';
 import { DowngradeSubscriptionDto } from './dto/downgrade-subscription.dto';
 import { PlanResponseDto } from './dto/plan-response.dto';
@@ -29,7 +30,7 @@ export class SubscriptionsController {
       'Returns publicly available active subscription tiers with prices and request limits. `requestLimit: null` means unlimited.',
   })
   @ApiOkResponse({ type: [PlanResponseDto] })
-  @ApiStandardTooManyRequests()
+  @ApiPublicErrors()
   async getPlans(): Promise<PlanResponseDto[]> {
     return this.subscriptionsService.getActivePlans();
   }
@@ -43,8 +44,7 @@ export class SubscriptionsController {
       'Returns the authenticated user active subscription, plan details, and current billing cycle window.',
   })
   @ApiOkResponse({ type: SubscriptionResponseDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async getMySubscription(
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<SubscriptionResponseDto> {
@@ -61,8 +61,7 @@ export class SubscriptionsController {
       'Calculates successful request usage within the active billing cycle and reports remaining quota. `remainingRequests` is null when unlimited.',
   })
   @ApiOkResponse({ type: SubscriptionStatusResponseDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async getStatus(@CurrentUser() user: AuthenticatedUser): Promise<SubscriptionStatusResponseDto> {
     return this.subscriptionsService.getSubscriptionStatus(user.id);
   }
@@ -77,11 +76,11 @@ export class SubscriptionsController {
       'Transitions the authenticated user to a higher-tier plan in a transaction and starts a new billing period.',
   })
   @ApiOkResponse({ type: SubscriptionResponseDto })
+  @ApiStandardUnprocessable()
   @ApiStandardBadRequest('Invalid plan slug or upgrade not allowed')
   @ApiStandardNotFound('Target plan does not exist or is inactive')
   @ApiStandardConflict('User already actively subscribed to this plan')
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async upgrade(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpgradeSubscriptionDto,
@@ -99,11 +98,11 @@ export class SubscriptionsController {
       'Schedules a subscription downgrade at the end of the current billing cycle, preserving entitlements until expiration.',
   })
   @ApiOkResponse({ type: SubscriptionResponseDto })
-  @ApiStandardBadRequest('User is already on this plan')
+  @ApiStandardUnprocessable()
+  @ApiStandardBadRequest('User is already on this plan or downgrade not allowed')
   @ApiStandardConflict('Subscription is already scheduled for downgrade')
   @ApiStandardNotFound('Target plan does not exist or is inactive')
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async downgrade(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: DowngradeSubscriptionDto,

@@ -19,11 +19,12 @@ import {
 } from '@nestjs/swagger';
 import { Request } from 'express';
 import {
+  ApiAuthErrors,
+  ApiPublicErrors,
   ApiStandardBadRequest,
   ApiStandardConflict,
-  ApiStandardInternalError,
-  ApiStandardTooManyRequests,
   ApiStandardUnauthorized,
+  ApiStandardUnprocessable,
 } from '../common/swagger/api-error-responses';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { AuthService } from './auth.service';
@@ -56,10 +57,9 @@ export class AuthController {
       'Creates a USER account, hashes the password with bcrypt, and sends an email verification token when SMTP is configured.',
   })
   @ApiCreatedResponse({ type: RegisterResponseDto })
-  @ApiStandardBadRequest()
+  @ApiStandardUnprocessable()
   @ApiStandardConflict('Email address is already in use')
-  @ApiStandardTooManyRequests()
-  @ApiStandardInternalError()
+  @ApiPublicErrors()
   async register(@Body() dto: RegisterDto): Promise<RegisterResponseDto> {
     return this.authService.register(dto);
   }
@@ -72,9 +72,9 @@ export class AuthController {
       'Authenticates credentials, issues a JWT access token and opaque refresh token, and creates a session.',
   })
   @ApiOkResponse({ type: LoginResponseDto })
-  @ApiStandardBadRequest()
-  @ApiStandardUnauthorized('Invalid credentials or inactive account')
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiStandardUnauthorized('Invalid credentials, inactive account, or email not verified')
+  @ApiPublicErrors()
   async login(@Body() dto: LoginDto, @Req() req: Request): Promise<LoginResponseDto> {
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
     const userAgent = req.headers['user-agent'];
@@ -90,9 +90,9 @@ export class AuthController {
       'Validates the refresh token, rotates it, revokes the previous session token, and returns a new JWT pair.',
   })
   @ApiOkResponse({ type: AuthTokensDto })
-  @ApiStandardBadRequest()
+  @ApiStandardUnprocessable()
   @ApiStandardUnauthorized('Invalid, expired, or revoked refresh token')
-  @ApiStandardTooManyRequests()
+  @ApiPublicErrors()
   async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request): Promise<AuthTokensDto> {
     const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip;
     const userAgent = req.headers['user-agent'];
@@ -110,8 +110,8 @@ export class AuthController {
       'Revokes the provided refresh token session (or all active sessions when omitted) for the authenticated user.',
   })
   @ApiOkResponse({ type: MessageResponseDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAuthErrors()
   async logout(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: LogoutDto,
@@ -128,8 +128,7 @@ export class AuthController {
       'Returns the safe profile of the authenticated user. Never includes password or token hashes.',
   })
   @ApiOkResponse({ type: UserResponseDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async getMe(@CurrentUser() user: AuthenticatedUser): Promise<UserResponseDto> {
     return this.authService.getCurrentUser(user.id);
   }
@@ -150,7 +149,7 @@ export class AuthController {
   })
   @ApiOkResponse({ type: MessageResponseDto })
   @ApiStandardBadRequest('Invalid, expired, or previously used verification token')
-  @ApiStandardTooManyRequests()
+  @ApiPublicErrors()
   async verifyEmailFromLink(@Query('token') token: string): Promise<MessageResponseDto> {
     return this.authService.verifyEmail(token);
   }
@@ -162,8 +161,9 @@ export class AuthController {
     description: 'Verifies the user email using a single-use token from registration or resend.',
   })
   @ApiOkResponse({ type: MessageResponseDto })
+  @ApiStandardUnprocessable()
   @ApiStandardBadRequest('Invalid, expired, or previously used verification token')
-  @ApiStandardTooManyRequests()
+  @ApiPublicErrors()
   async verifyEmail(@Body() dto: VerifyEmailDto): Promise<MessageResponseDto> {
     return this.authService.verifyEmail(dto.token);
   }
@@ -176,8 +176,8 @@ export class AuthController {
       'Dispatches a new verification token when an unverified account exists. Always returns a generic confirmation to avoid account enumeration.',
   })
   @ApiOkResponse({ type: MessageResponseDto })
-  @ApiStandardBadRequest()
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiPublicErrors()
   async resendVerification(@Body() dto: ResendVerificationDto): Promise<MessageResponseDto> {
     return this.authService.resendVerification(dto.email);
   }

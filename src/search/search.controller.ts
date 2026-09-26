@@ -27,12 +27,14 @@ import { AuthenticatedUser } from '../auth/interfaces/authenticated-user.interfa
 import { MessageResponseDto } from '../common/dto/message-response.dto';
 import { PaginationQueryDto } from '../common/dto/pagination-query.dto';
 import {
+  ApiAuthErrors,
+  ApiStandardBadGateway,
   ApiStandardBadRequest,
   ApiStandardForbidden,
+  ApiStandardGatewayTimeout,
   ApiStandardNotFound,
   ApiStandardServiceUnavailable,
-  ApiStandardTooManyRequests,
-  ApiStandardUnauthorized,
+  ApiStandardUnprocessable,
 } from '../common/swagger/api-error-responses';
 import { SubscriptionUsageGuard } from '../subscriptions/guards/subscription-usage.guard';
 import { CreateWebSearchDto } from './dto/create-web-search.dto';
@@ -62,10 +64,11 @@ export class SearchController {
       'Validates subscription quota, executes the configured search provider, persists history, and records successful usage only. Caching (when Redis is available) is an internal optimization and is not exposed to clients.',
   })
   @ApiCreatedResponse({ type: WebSearchResponseDto })
-  @ApiStandardBadRequest('Invalid search query')
-  @ApiStandardTooManyRequests('Subscription usage limit or HTTP rate limit exceeded')
+  @ApiStandardUnprocessable()
   @ApiStandardServiceUnavailable('Search provider not configured')
-  @ApiStandardUnauthorized()
+  @ApiStandardBadGateway('Search provider request failed')
+  @ApiStandardGatewayTimeout('Search provider request timed out')
+  @ApiAuthErrors()
   async search(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateWebSearchDto,
@@ -83,8 +86,8 @@ export class SearchController {
     description: 'Returns a paginated list of the authenticated user web search history.',
   })
   @ApiOkResponse({ type: PaginatedWebSearchHistoryDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAuthErrors()
   async history(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: PaginationQueryDto,
@@ -98,8 +101,8 @@ export class SearchController {
     description: 'Returns the most recent search records for the authenticated user.',
   })
   @ApiOkResponse({ type: [RecentSearchResponseDto] })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAuthErrors()
   async recent(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: RecentSearchesQueryDto,
@@ -114,8 +117,8 @@ export class SearchController {
       'Returns distinct previous queries for the authenticated user, optionally filtered by a prefix/term.',
   })
   @ApiOkResponse({ type: SearchSuggestionsResponseDto })
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiStandardUnprocessable()
+  @ApiAuthErrors()
   async suggestions(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: SearchSuggestionsQueryDto,
@@ -130,10 +133,10 @@ export class SearchController {
   })
   @ApiParam({ name: 'id', description: 'Web search record UUID' })
   @ApiOkResponse({ type: WebSearchResponseDto })
+  @ApiStandardBadRequest('Invalid search record UUID')
   @ApiStandardNotFound('Search record not found')
   @ApiStandardForbidden('Ownership violation')
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async getOne(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
@@ -149,10 +152,10 @@ export class SearchController {
   })
   @ApiParam({ name: 'id', description: 'Web search record UUID' })
   @ApiOkResponse({ type: MessageResponseDto })
+  @ApiStandardBadRequest('Invalid search record UUID')
   @ApiStandardNotFound('Search record not found')
   @ApiStandardForbidden('Ownership violation')
-  @ApiStandardUnauthorized()
-  @ApiStandardTooManyRequests()
+  @ApiAuthErrors()
   async remove(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
