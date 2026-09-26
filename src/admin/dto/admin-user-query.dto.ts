@@ -41,7 +41,7 @@ export class AdminUserQueryDto {
   limit: number = 20;
 
   @ApiPropertyOptional({
-    example: 'jane',
+    example: '',
     description: 'Search by email, first name, or last name',
   })
   @IsOptional()
