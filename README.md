@@ -270,3 +270,21 @@ End-to-end tests force `EMAIL_MOCK=true`. Use `AI_COMPLETION_MOCK=true` and `WEB
 | `npm test` / `npm run test:e2e` | Unit / end-to-end tests |
 | `npm run prisma:migrate:deploy` | Apply migrations |
 | `npm run prisma:seed` | Seed roles, plans, providers, and admin |
+
+## Postman Collection
+
+The collection is in the `postman` folder on the `development` branch.
+
+- **Collection location:** `postman/EchoGPT.Backend.API.postman_collection.json`
+- **GitHub:** [View Postman Collection](https://github.com/reazulislamreaz/echogpt/blob/development/postman/EchoGPT.Backend.API.postman_collection.json)
+
+**Import steps:**
+
+1. Open Postman.
+2. Click **Import**.
+3. Select `postman/EchoGPT.Backend.API.postman_collection.json` from this repository, or paste the GitHub link above.
+4. Import the collection.
+5. Set `baseUrl` to `http://localhost:3000/api/v1`, as described in [Installation and setup](#installation-and-setup).
+6. Use **Authorization → Bearer Token** with the JWT access token from login on protected requests.
+
+A local environment file is in the same folder: `postman/EchoGPT.Local.postman_environment.json`. Import it the same way if you want those variables prefilled.
