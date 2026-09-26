@@ -1,582 +1,272 @@
 # EchoGPT Backend API
 
-REST API backend for the **EchoGPT Chrome Extension**. It provides authentication, user and subscription management, encrypted AI provider configuration, conversations with AI chat (including Server-Sent Events streaming), web search with personal history, usage metering, HTTP rate limiting, and administrator analytics.
+REST API for the EchoGPT Chrome extension. It covers authentication, user accounts, subscription plans and usage limits, AI provider configuration, chat, web search, and admin management.
 
-The API is versioned under `/api/v1` and ships with interactive Swagger/OpenAPI documentation.
+All routes are versioned under `/api/v1`. Interactive API docs are available in Swagger.
 
-## Features
+## Technology stack
 
-- User registration and login with **bcrypt** password hashing
-- **JWT** access tokens and opaque **refresh tokens** (hashed in `Session`, with rotation)
-- Secure logout and session revocation
-- Email verification via **Nodemailer** (SMTP optional; fail-open if unavailable)
-- User profile management, password change, and soft-delete
-- Role-based access control (**USER** / **ADMIN**)
-- Subscription plans (Free / Premium), upgrade / downgrade, and billing periods
-- Dynamic usage limits from successful `APIUsageLog` aggregation
-- AI provider management (system + per-user config) with **AES-256-GCM** encrypted API keys
-- Supported completion adapters: **OpenAI**, **Anthropic Claude**, **Google Gemini**
-- Conversations, messages, and AI chat
-- AI response **SSE streaming** (`chunk` / `done` / `error`)
-- Web search, search history, recent searches, and suggestions
-- Optional **Redis** caching for search results (fail-open)
-- Global HTTP **rate limiting** (`@nestjs/throttler`)
-- Admin dashboard, user/subscription/provider management, usage analytics, and request logs
-- Health checks (database critical; Redis/SMTP informational)
-- Swagger / OpenAPI at `/api/docs`
-
-## Tech stack
-
-| Technology | Purpose |
+| Technology | Role |
 | --- | --- |
-| NestJS | Application framework and modular HTTP API |
-| TypeScript | Typed application code |
-| PostgreSQL | Primary relational database |
-| Prisma | ORM, schema, migrations, and seeding |
-| JWT (`@nestjs/jwt`, passport-jwt) | Access-token authentication |
-| bcrypt | Password hashing |
-| class-validator / class-transformer | DTO validation and transformation |
-| Nodemailer | SMTP email delivery for verification |
-| Redis + ioredis | Optional cache and throttle storage |
-| `@nestjs/throttler` | Global HTTP rate limiting |
-| OpenAI / Anthropic / Gemini HTTP APIs | AI chat completions (via provider adapters) |
-| Serper (configurable) | Web search provider integration |
-| Swagger (`@nestjs/swagger`) | Interactive OpenAPI documentation |
-| Docker Compose | Optional local PostgreSQL / Redis (and optional API image) |
+| NestJS + TypeScript | HTTP API |
+| PostgreSQL + Prisma | Database, migrations, and seed |
+| JWT + bcrypt | Access tokens and password hashing |
+| class-validator | Request validation |
+| Swagger / OpenAPI | API documentation |
 | Jest + Supertest | Unit and end-to-end tests |
-| ESLint + Prettier | Linting and formatting |
+| Docker Compose | Optional PostgreSQL, Redis, and API |
+| Nodemailer | Email verification (optional SMTP) |
+| Redis | Optional search cache and rate-limit storage |
 
-## Architecture
+## Implemented features
 
-The project uses a modular NestJS layered design (not Hexagonal/CQRS/DDD):
+- Registration, login, JWT access tokens, and rotating refresh tokens
+- Logout and session revocation
+- Role-based access (`USER`, `ADMIN`)
+- Profile, password change, account status, and soft delete
+- Free and Premium plans, upgrade/downgrade, billing period, and remaining requests
+- Usage counted from successful API logs and enforced on chat and web search
+- AI providers: OpenAI, Claude, and Gemini, with encrypted API keys
+- User provider configuration, system default, enable/disable, and health check
+- Persistent conversations and messages, with ownership checks
+- Web search with history, recent searches, and suggestions
+- Admin dashboard, users, subscriptions, providers, usage analytics, request logs, and system health
+- Swagger documentation for every endpoint
+- Global HTTP rate limiting
 
-```text
-Client (Chrome extension / HTTP client / Swagger UI)
-    ↓
-Controller          — route mapping, DTO binding, Swagger metadata
-    ↓
-Guards / Validation — JWT auth, roles, subscription quota, ValidationPipe
-    ↓
-Application service — business rules and transactions
-    ↓
-Prisma / externals  — PostgreSQL, AI providers, search, SMTP, Redis (optional)
-    ↓
-HTTP response       — typed DTOs or SSE stream
-```
+### Bonus features
 
-| Layer | Responsibility |
+| Feature | What it does |
 | --- | --- |
-| Controllers | Thin HTTP adapters; no Prisma access and no business logic |
-| Guards | `JwtAuthGuard`, `RolesGuard`, `SubscriptionUsageGuard`, global `ThrottlerGuard` |
-| Validation | Global `ValidationPipe` (whitelist, forbid unknown fields, transform) |
-| Services | Domain logic, ownership checks, transactions, usage recording |
-| Prisma | Database access to PostgreSQL |
-| External adapters | AI completion, web search, email, Redis (optional / fail-open) |
-| Cross-cutting | `AllExceptionsFilter`, security headers, Swagger bootstrap |
+| Email verification | Verification email, verify link/token, and resend. SMTP is optional. |
+| Streaming chat (SSE) | `POST /conversations/:id/messages/stream` emits `chunk`, `done`, and `error` events. |
+| Redis search caching | Caches web-search results when `REDIS_HOST` is set. The API still runs if Redis is off. |
 
-Request flow for protected APIs:
+OpenAI and Claude stream response chunks. Gemini returns the completed response as a single SSE event.
 
-1. Global throttle check
-2. JWT authentication (when required)
-3. Role check (admin routes)
-4. Subscription usage check (chat send / web search)
-5. Service execution
-6. Consistent JSON error envelope on failure
+## Authentication
 
-## Project structure
+Public registration and login. Protected routes use a JWT access token. Refresh tokens are stored hashed, rotated on refresh, and revoked on logout. Password changes also revoke sessions.
 
-```text
-echogpt/
-├── prisma/
-│   ├── schema.prisma
-│   ├── seed.ts
-│   └── migrations/
-├── src/
-│   ├── main.ts                 # Bootstrap, CORS, versioning, Swagger
-│   ├── app.module.ts
-│   ├── auth/                   # Register, login, refresh, logout, email verification
-│   ├── users/                  # Profile, password, soft-delete; admin list/get
-│   ├── roles/                  # USER/ADMIN enum, RolesGuard
-│   ├── sessions/               # Session module wiring
-│   ├── subscriptions/          # Plans, status, upgrade/downgrade, admin plans
-│   ├── providers/              # User + admin AI provider management
-│   ├── chat/                   # Conversations, messages, SSE streaming
-│   ├── search/                 # Web search + history (+ optional Redis cache)
-│   ├── usage/                  # APIUsageLog recording / aggregation helpers
-│   ├── admin/                  # Dashboard, users, analytics, logs, system health
-│   ├── health/                 # Public health probe
-│   ├── prisma/                 # PrismaModule / PrismaService
-│   └── common/                 # Config, filters, redis, swagger, encryption, DTOs
-├── test/                       # E2E specs + setup
-├── docker-compose.yml
-├── Dockerfile
-├── .env.example
-└── package.json
-```
+| Method | Path | Access |
+| --- | --- | --- |
+| POST | `/auth/register` | Public |
+| POST | `/auth/login` | Public |
+| POST | `/auth/refresh` | Public |
+| POST | `/auth/logout` | JWT |
+| GET | `/auth/me` | JWT |
+| GET | `/auth/verify-email` | Public |
+| POST | `/auth/verify-email` | Public |
+| POST | `/auth/resend-verification` | Public |
 
-## Prerequisites
+Set `REQUIRE_EMAIL_VERIFICATION=true` to block login until the email is verified. The default is `false`.
 
-- Node.js 22+ (Dockerfile uses `node:22-alpine`)
-- npm
-- **PostgreSQL** (required) — local install or Docker
-- **Redis** (optional) — leave disabled unless you want search caching / Redis-backed throttling
-- **Docker** (optional) — convenience for running PostgreSQL and/or Redis; not mandatory
+## User management
 
-## Database & Infrastructure Setup
+Users can view and update their own profile, change their password, and soft-delete their account. The client cannot set another user’s id. Admins can list users and open a user by id.
 
-EchoGPT uses **PostgreSQL** as its primary database and **Redis** as an optional infrastructure dependency.
+| Method | Path | Access |
+| --- | --- | --- |
+| GET | `/users/me` | JWT |
+| PATCH | `/users/me` | JWT |
+| PATCH | `/users/me/password` | JWT |
+| DELETE | `/users/me` | JWT |
+| GET | `/users` | Admin |
+| GET | `/users/:id` | Admin |
 
-### Option A — Use Local PostgreSQL
+## Subscription management
 
-Install and run PostgreSQL on your machine (without Docker), create a database (for example `echogpt`), then set:
+Registration creates an active Free subscription. Plans expose a request limit (`null` means unlimited). Remaining requests are calculated from successful usage in the current billing period. There is no payment gateway.
 
-```env
-DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/echogpt
-```
+| Method | Path | Access |
+| --- | --- | --- |
+| GET | `/subscriptions/plans` | Public |
+| GET | `/subscriptions/me` | JWT |
+| GET | `/subscriptions/status` | JWT |
+| POST | `/subscriptions/upgrade` | JWT |
+| POST | `/subscriptions/downgrade` | JWT |
 
-Generate the Prisma Client and apply migrations:
+Chat and web search return **429** when the plan limit is reached. Failed provider calls are logged and do not consume quota.
 
-```bash
-npx prisma generate
-npx prisma migrate deploy
-```
+## AI provider management
 
-### Option B — Use Docker
+System providers are managed by admins. Users can save their own provider settings. API keys are encrypted with AES-256-GCM and are never returned in responses (a masked preview may be shown).
 
-Docker can run PostgreSQL for you. From the project root:
+**User** (`/providers`, JWT)
 
-```bash
-docker compose up -d postgres
-```
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/providers` | List active providers |
+| GET | `/providers/me` | List own configs |
+| PUT | `/providers/me/:providerId` | Save config and key |
+| POST | `/providers/me/:providerId/default` | Set personal default |
+| DELETE | `/providers/me/:providerId` | Remove own config |
 
-Compose defaults (`docker-compose.yml`):
+**Admin** (`/admin/ai-providers`): create, list, get, update, enable/disable, set the system default, run a health check, and delete.
 
-- User: `echogpt`
-- Password: `echogpt`
-- Database: `echogpt`
-- Port: `5432`
+## Chat API
 
-Example `DATABASE_URL` for this service:
+Conversations and messages belong to the signed-in user. Each request can select a provider and model. Successful chats are written to usage logs.
 
-```env
-DATABASE_URL=postgresql://echogpt:echogpt@localhost:5432/echogpt?schema=public
-```
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/conversations` | Create |
+| GET | `/conversations` | List (paginated) |
+| GET | `/conversations/:id` | Get one |
+| PATCH | `/conversations/:id` | Update |
+| DELETE | `/conversations/:id` | Soft-delete |
+| GET | `/conversations/:id/messages` | Message history |
+| POST | `/conversations/:id/messages` | Send a prompt |
+| POST | `/conversations/:id/messages/stream` | Stream the reply (SSE) |
 
-Then generate the Prisma Client and apply migrations:
+## Web Search API
 
-```bash
-npx prisma generate
-npx prisma migrate deploy
-```
+Search runs through the configured provider (Serper by default), stores the user’s history, and counts toward the subscription limit.
 
-### Redis (Optional)
+| Method | Path | Purpose |
+| --- | --- | --- |
+| POST | `/web-search` | Run a search |
+| GET | `/web-search/history` | History (paginated) |
+| GET | `/web-search/recent` | Recent searches |
+| GET | `/web-search/suggestions` | Suggestions from history |
+| GET | `/web-search/:id` | One owned record |
+| DELETE | `/web-search/:id` | Delete an owned record |
 
-Redis is **optional**. The application starts and operates without it (fail-open design).
+## Admin APIs
 
-When Redis is available and `REDIS_HOST` is set, it is used for:
+Every `/admin` route requires a JWT with the `ADMIN` role.
 
-- Web-search result caching
-- Distributed HTTP rate-limit storage
+| Area | Paths |
+| --- | --- |
+| Dashboard | `GET /admin/dashboard` |
+| Users | `GET /admin/users`, `GET /admin/users/:id`, status, role, subscription, usage |
+| Usage and logs | `GET /admin/usage`, `GET /admin/logs` |
+| System health | `GET /admin/system/health` |
+| Plans | `GET/POST /admin/subscription-plans`, `PATCH /admin/subscription-plans/:id` |
+| Subscriptions | `GET /admin/subscriptions`, `GET /admin/subscriptions/:id`, `PATCH .../status` |
+| Providers | `/admin/ai-providers` |
 
-When Redis is unavailable or `REDIS_HOST` is empty:
+`GET /api/v1/health` is public. The database is required (**503** when it is down). Redis and SMTP are reported but do not fail the overall status.
 
-- Web-search caching is bypassed
-- The rate limiter falls back to in-memory storage
-- Core API functionality (auth, users, subscriptions, chat, search, admin) remains available
+## Swagger / OpenAPI
 
-To run Redis with Docker:
+**http://localhost:3000/api/docs**
 
-```bash
-docker compose up -d redis
-```
+1. Call `POST /api/v1/auth/login`.
+2. Copy `accessToken` from the response.
+3. In Swagger, click **Authorize** and paste the token.
 
-Then set in `.env` (example):
+Swagger sends `Authorization: Bearer <token>`. Request and response schemas, auth requirements, and error codes are documented on each operation.
 
-```env
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-```
+## Database
 
-To start PostgreSQL and Redis together (optional convenience only):
+PostgreSQL with Prisma. The schema, seed script, and migration files are in the repository:
 
-```bash
-docker compose up -d postgres redis
-```
+- `prisma/schema.prisma`
+- `prisma/seed.ts`
+- `prisma/migrations/`
 
-## Getting started
+Main models: User, Role, Session, EmailVerificationToken, SubscriptionPlan, Subscription, AIProvider, UserAIProvider, Conversation, Message, WebSearch, APIUsageLog.
 
-### 1. Clone and install
+The seed creates `USER` and `ADMIN` roles, Free and Premium plans, OpenAI / Claude / Gemini provider records (without API keys), and one admin user from `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
+
+## Environment variables
+
+`.env.example` is included. Copy it to `.env` and do not commit `.env`.
+
+**Required**
+
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_ACCESS_SECRET` | Access-token signing secret |
+| `ENCRYPTION_KEY` | Secret used to encrypt provider API keys |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Credentials for the seeded admin (required to run the seed) |
+
+**Common optional settings**
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `3000` | HTTP port |
+| `JWT_ACCESS_EXPIRES_IN` | `15m` | Access token lifetime |
+| `JWT_REFRESH_EXPIRES_IN` | `7d` | Refresh token lifetime |
+| `REQUIRE_EMAIL_VERIFICATION` | `false` | Block login until verified |
+| `REDIS_HOST` | empty | Empty disables Redis |
+| `WEB_SEARCH_API_KEY` | — | Search provider key |
+| `WEB_SEARCH_MOCK` | `false` | Return mock search results |
+| `AI_COMPLETION_MOCK` | `false` | Return mock AI replies |
+| `SMTP_HOST` and related | — | Real verification email. Leave unset to skip SMTP. |
+
+See `.env.example` for SMTP, Redis, rate-limit, and timeout variables.
+
+## Installation and setup
+
+**Prerequisites:** Node.js 22+, npm, and PostgreSQL (local or Docker).
 
 ```bash
 git clone <repository-url>
 cd echogpt
 npm install
-```
-
-### 2. Configure environment
-
-```bash
 cp .env.example .env
 ```
 
-Set at least:
+Set `DATABASE_URL`, `JWT_ACCESS_SECRET`, `ENCRYPTION_KEY`, `ADMIN_EMAIL`, and `ADMIN_PASSWORD` in `.env`.
 
-| Variable | Notes |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL connection string (required) |
-| `JWT_ACCESS_SECRET` | Strong secret for access tokens (or legacy `JWT_SECRET`) |
-| `ENCRYPTION_KEY` | Secret used to derive AES-256-GCM key for provider API keys |
-
-Example:
-
-```env
-DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/echogpt
-JWT_ACCESS_SECRET=change-me-to-a-long-random-string
-ENCRYPTION_KEY=change-me-to-another-long-random-string
-```
-
-Leave `REDIS_HOST` empty unless you intentionally enable optional Redis.
-
-### 3. Database setup
-
-Follow [Database & Infrastructure Setup](#database--infrastructure-setup) (local PostgreSQL or Docker). Ensure `npx prisma generate` and `npx prisma migrate deploy` have been run.
-
-### 4. Seed reference data
+Start PostgreSQL, then apply the included migrations and seed:
 
 ```bash
+docker compose up -d postgres
+npx prisma generate
+npx prisma migrate deploy
 npm run prisma:seed
-```
-
-### 5. Run the API
-
-```bash
 npm run start:dev
 ```
 
 | Resource | URL |
 | --- | --- |
-| API base | http://localhost:3000/api/v1 |
+| API | http://localhost:3000/api/v1 |
 | Health | http://localhost:3000/api/v1/health |
-| Swagger UI | http://localhost:3000/api/docs |
+| Swagger | http://localhost:3000/api/docs |
 
-Interactive OpenAPI docs include request/response schemas and a JWT **Authorize** button for trying authenticated endpoints.
+Docker PostgreSQL defaults: user `echogpt`, password `echogpt`, database `echogpt`, port `5432`.
 
-### Seeded demo admin
-
-Set `ADMIN_EMAIL` and `ADMIN_PASSWORD` in `.env` (see `.env.example`), then run the seed. Login uses those exact credentials — they are never hardcoded in source. Seed also creates `USER` / `ADMIN` roles, `free` / `premium` plans, and OpenAI / Claude / Gemini provider records (without API keys).
-
-## Environment variables
-
-Copy `.env.example` → `.env`. Never commit `.env`.
-
-### Required
-
-| Variable | Description |
-| --- | --- |
-| `DATABASE_URL` | PostgreSQL URL |
-| `JWT_ACCESS_SECRET` | JWT signing secret (`JWT_SECRET` accepted as fallback) |
-| `ENCRYPTION_KEY` | Encryption secret for AI provider API keys |
-
-### Application
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `NODE_ENV` | `development` | `development` \| `production` \| `test` |
-| `PORT` | `3000` | HTTP port |
-| `API_PREFIX` | `api` | Global prefix |
-| `API_VERSION` | `1` | URI version (`/api/v1`) |
-| `CORS_ORIGIN` | `*` | CORS origin(s), comma-separated when not `*` |
-| `SWAGGER_ENABLED` | `true` | Enable Swagger UI |
-| `SWAGGER_PATH` | `docs` | Path under API prefix (`/api/docs`) |
-
-### Auth
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `JWT_ACCESS_EXPIRES_IN` | `15m` | Access token TTL |
-| `JWT_REFRESH_EXPIRES_IN` | `7d` | Refresh token TTL |
-| `BCRYPT_SALT_ROUNDS` | `10` | bcrypt cost factor |
-| `EMAIL_VERIFICATION_EXPIRES_HOURS` | `24` | Verification token lifetime |
-| `REQUIRE_EMAIL_VERIFICATION` | `false` | When `true`, unverified users cannot log in |
-| `ADMIN_EMAIL` | — | Admin email for `prisma seed` (login uses this value) |
-| `ADMIN_PASSWORD` | — | Admin password for `prisma seed` (never commit real values) |
-
-### SMTP (optional)
-
-When enabling email, set **all** of: `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `EMAIL_VERIFICATION_URL`.
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `SMTP_HOST` | — | SMTP host |
-| `SMTP_PORT` | `587` | SMTP port |
-| `SMTP_SECURE` | `false` | TLS flag |
-| `SMTP_USER` / `SMTP_PASS` | — | Credentials |
-| `SMTP_FROM` / `SMTP_FROM_NAME` | / `EchoGPT` | From address / display name |
-| `EMAIL_VERIFICATION_URL` | — | Base verify URL (token appended as `?token=`) |
-| `EMAIL_MOCK` | `false` | Skip real SMTP sends (e2e forces `true`) |
-
-Incomplete SMTP configuration fails environment validation. Unavailable SMTP does not crash the running app; registration still succeeds and verification can be resent later.
-
-### Redis (optional)
-
-Redis is not required. Keep `REDIS_HOST` empty to run without Redis.
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `REDIS_HOST` | empty | Empty disables Redis |
-| `REDIS_PORT` | `6379` | Redis port |
-| `REDIS_PASSWORD` | — | Optional password |
-| `REDIS_DB` | `0` | Database index |
-| `REDIS_KEY_PREFIX` | `echogpt:` | Key prefix |
-| `REDIS_CONNECT_TIMEOUT_MS` | `2000` | Connect timeout |
-| `REDIS_COMMAND_TIMEOUT_MS` | `1000` | Command timeout |
-
-### Rate limiting
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `THROTTLE_TTL_MS` | `60000` | Window length in ms |
-| `THROTTLE_LIMIT` | `100` | Max requests per window |
-
-Uses Redis for throttle storage when Redis is configured and available; otherwise falls back to in-memory storage (fail-open).
-
-### AI and web search
-
-| Variable | Default | Description |
-| --- | --- | --- |
-| `AI_COMPLETION_MOCK` | `false` | Mock AI responses (useful for tests) |
-| `AI_REQUEST_TIMEOUT_MS` | `30000` | Upstream AI timeout |
-| `WEB_SEARCH_MOCK` | `false` | Mock search results |
-| `WEB_SEARCH_PROVIDER` | `serper` | Search provider id |
-| `WEB_SEARCH_API_KEY` | — | Search provider API key |
-| `WEB_SEARCH_BASE_URL` | — | Optional override base URL |
-| `WEB_SEARCH_TIMEOUT_MS` | `15000` | Search timeout |
-| `WEB_SEARCH_DEFAULT_LIMIT` | `10` | Default result limit |
-| `WEB_SEARCH_CACHE_TTL_SECONDS` | `300` | Redis cache TTL for search results |
-
-## Scripts
-
-| Command | Description |
-| --- | --- |
-| `npm run start:dev` | Start API in watch mode |
-| `npm run start` | Start once (Nest CLI) |
-| `npm run start:prod` | Run compiled `dist/main` |
-| `npm run build` | Compile TypeScript |
-| `npm run lint` | ESLint + Prettier fix |
-| `npm run lint:check` | ESLint without write |
-| `npm test` | Unit tests |
-| `npm run test:e2e` | End-to-end tests |
-| `npm run test:cov` | Unit tests with coverage |
-| `npm run prisma:generate` | Generate Prisma Client |
-| `npm run prisma:validate` | Validate Prisma schema |
-| `npm run prisma:migrate:dev` | Create/apply migrations (dev) |
-| `npm run prisma:migrate:deploy` | Apply migrations (deploy) |
-| `npm run prisma:seed` | Seed roles, plans, providers, demo admin |
-| `npm run prisma:studio` | Open Prisma Studio |
-
-## API documentation (Swagger)
-
-Official interactive documentation:
-
-**http://localhost:3000/api/docs**
-
-Use **Authorize** with a JWT access token from `POST /api/v1/auth/login` (`Bearer <token>`).
-
-## API overview
-
-All routes below are under `/api/v1` unless noted.
-
-### Auth — `/auth`
-
-| Method | Path | Auth | Description |
-| --- | --- | --- | --- |
-| POST | `/auth/register` | Public | Register user + FREE subscription |
-| POST | `/auth/login` | Public | Issue access + refresh tokens |
-| POST | `/auth/refresh` | Public | Rotate refresh token / new access token |
-| POST | `/auth/logout` | JWT | Revoke refresh session(s) |
-| GET | `/auth/me` | JWT | Current user profile |
-| GET | `/auth/verify-email?token=` | Public | Verify via email link |
-| POST | `/auth/verify-email` | Public | Verify via body token |
-| POST | `/auth/resend-verification` | Public | Resend verification email |
-
-### Users — `/users`
-
-| Method | Path | Auth | Description |
-| --- | --- | --- | --- |
-| GET | `/users/me` | JWT | Get profile |
-| PATCH | `/users/me` | JWT | Update profile |
-| PATCH | `/users/me/password` | JWT | Change password (revokes sessions) |
-| DELETE | `/users/me` | JWT | Soft-delete account |
-| GET | `/users` | JWT + ADMIN | Paginated user list |
-| GET | `/users/:id` | JWT + ADMIN | User by id |
-
-### Subscriptions — `/subscriptions`
-
-| Method | Path | Auth | Description |
-| --- | --- | --- | --- |
-| GET | `/subscriptions/plans` | Public | Active plans |
-| GET | `/subscriptions/me` | JWT | Current subscription |
-| GET | `/subscriptions/status` | JWT | Usage + remaining requests |
-| POST | `/subscriptions/upgrade` | JWT | Upgrade plan |
-| POST | `/subscriptions/downgrade` | JWT | Schedule downgrade |
-
-`requestLimit = null` means unlimited. Quota is enforced with HTTP **429** on chat send and web search.
-
-### AI providers — `/providers` and `/admin/ai-providers`
-
-**User**
-
-| Method | Path | Description |
-| --- | --- | --- |
-| GET | `/providers` | List active system providers |
-| GET | `/providers/me` | List own provider configs |
-| PUT | `/providers/me/:providerId` | Upsert own config / encrypted key |
-| POST | `/providers/me/:providerId/default` | Set user default |
-| DELETE | `/providers/me/:providerId` | Delete own config |
-
-**Admin** (`/admin/ai-providers`, ADMIN required): create, list, get, update, enable/disable, set default, health-check, delete.
-
-Raw API keys are never returned; responses may include a masked `keyPreview`.
-
-### Chat — `/conversations`
-
-| Method | Path | Notes |
-| --- | --- | --- |
-| POST | `/conversations` | Create |
-| GET | `/conversations` | Paginated list |
-| GET | `/conversations/:id` | Detail + recent messages |
-| PATCH | `/conversations/:id` | Update |
-| DELETE | `/conversations/:id` | Soft-delete |
-| GET | `/conversations/:id/messages` | Paginated messages |
-| POST | `/conversations/:id/messages` | Chat (subscription guard) |
-| POST | `/conversations/:id/messages/stream` | SSE stream (subscription guard) |
-
-Streaming emits `event: chunk|done|error` with JSON `data` payloads. Failed streams do not consume successful subscription quota.
-
-### Web search — `/web-search`
-
-| Method | Path | Notes |
-| --- | --- | --- |
-| POST | `/web-search` | Search (subscription guard) |
-| GET | `/web-search/history` | Paginated history |
-| GET | `/web-search/recent` | Recent searches |
-| GET | `/web-search/suggestions` | Suggestions from history |
-| GET | `/web-search/:id` | One owned record |
-| DELETE | `/web-search/:id` | Delete owned record |
-
-Redis caching is an internal optimization and is not required by clients.
-
-### Admin — `/admin` (JWT + ADMIN)
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/admin/dashboard` | Nested dashboard statistics |
-| GET | `/admin/users` | List/search/filter users |
-| GET | `/admin/users/:id` | User details |
-| PATCH | `/admin/users/:id/status` | Activate / deactivate |
-| PATCH | `/admin/users/:id/role` | Change USER/ADMIN |
-| GET | `/admin/users/:id/subscription` | Active subscription |
-| GET | `/admin/users/:id/usage` | Usage summary |
-| GET | `/admin/usage` | Usage analytics |
-| GET | `/admin/logs` | Paginated request logs |
-| GET | `/admin/system/health` | System + provider status |
-| * | `/admin/subscription-plans` | Plan list/create/update |
-| * | `/admin/subscriptions` | List/get/update status |
-| * | `/admin/ai-providers` | Provider management |
-
-### Health — `/health`
-
-`GET /api/v1/health` — database is critical (**503** when down). Redis and SMTP are informational and do not fail overall status when unavailable.
-
-## Subscription and usage
-
-- Registration provisions an active **FREE** subscription in a transaction.
-- Plans are stored as `SubscriptionPlan` (`free`, `premium` seeded).
-- Status values: `ACTIVE`, `TRIALING`, `PAST_DUE`, `CANCELED`, `EXPIRED`.
-- Usage is counted dynamically from successful (`2xx`/`3xx`) `APIUsageLog` rows in the billing window `[currentPeriodStart, currentPeriodEnd)`.
-- Failed provider calls may still be logged for analytics but **do not** consume quota.
-- There are no duplicated `currentUsage` / `remainingRequests` columns in the database.
-- `SubscriptionUsageGuard` protects chat send and web search.
-
-## Security notes
-
-- Passwords hashed with bcrypt; refresh and verification tokens stored hashed only
-- AI provider keys encrypted at rest (`ENCRYPTION_KEY` → AES-256-GCM)
-- Ownership checks on conversations, messages, and search history
-- Admin routes require server-side `RolesGuard`
-- Global validation rejects unknown body fields (**422** Unprocessable Entity)
-- Business-rule rejections and invalid path UUIDs use **400** Bad Request
-- Unexpected failures return a sanitized **500** envelope (no Prisma/SQL/stack leakage)
-- Custom security response headers applied at bootstrap
-- Secrets must not appear in Swagger examples, logs, or Git (use `.env.example` placeholders only)
-
-### Error response envelope
-
-All HTTP errors (except SSE `error` events on streaming chat) use:
-
-```json
-{
-  "statusCode": 401,
-  "message": "Unauthorized",
-  "error": "Unauthorized",
-  "timestamp": "2026-09-26T10:00:00.000Z",
-  "path": "/api/v1/auth/login",
-  "requestId": "optional-when-x-request-id-is-sent"
-}
+```env
+DATABASE_URL=postgresql://echogpt:echogpt@localhost:5432/echogpt?schema=public
 ```
 
-`message` may be a string or a string array (validation). Applicable status codes include 400, 401, 403, 404, 409, 422, 429, 500, 502, 503, and 504 depending on the endpoint.
+For a local PostgreSQL install, point `DATABASE_URL` at that server and run the same Prisma commands. Docker is not required.
+
+Log in as the seeded admin with the email and password from `.env`.
+
+## Docker
+
+```bash
+docker compose up -d postgres          # database
+docker compose up -d redis             # optional cache
+docker compose up -d postgres redis    # both
+docker compose --profile full up -d --build   # API + PostgreSQL + Redis
+```
+
+Redis is optional. To enable it, set `REDIS_HOST=127.0.0.1` and `REDIS_PORT=6379`, leave `REDIS_PASSWORD` empty for the Compose container, and restart the API. `.env` is read only at startup.
 
 ## Testing
 
 ```bash
-# Unit tests
-npm test
-
-# E2E tests (requires configured DATABASE_URL / migrations)
-npm run test:e2e
+npm test          # unit tests
+npm run test:e2e  # end-to-end tests (needs DATABASE_URL and applied migrations)
+npm run build
+npm run lint:check
 ```
 
-E2E setup forces `EMAIL_MOCK=true` and raises `THROTTLE_LIMIT` so tests do not send real mail or hit default rate limits. Use `AI_COMPLETION_MOCK` / `WEB_SEARCH_MOCK` when live providers are unavailable.
+End-to-end tests force `EMAIL_MOCK=true`. Use `AI_COMPLETION_MOCK=true` and `WEB_SEARCH_MOCK=true` when live AI or search keys are not configured.
 
-## Docker
+## Scripts
 
-Docker is **optional**. Use it only if you prefer containers over a local PostgreSQL install.
-
-**PostgreSQL only (required database via Compose):**
-
-```bash
-docker compose up -d postgres
-```
-
-**Redis only (optional):**
-
-```bash
-docker compose up -d redis
-```
-
-**PostgreSQL + Redis (optional convenience):**
-
-```bash
-docker compose up -d postgres redis
-```
-
-**Full stack (API + Postgres + Redis):**
-
-```bash
-# Ensure .env is filled
-docker compose --profile full up -d --build
-```
-
-The `api` service is behind Compose profile `full`. That profile wires Compose Postgres and Redis into the API container; for a normal local Node process you only need PostgreSQL (and Redis only if you enable it).
-
-## Known limitations
-
-- No payment gateway (subscription upgrade/downgrade is application-level only)
-- Redis and SMTP are optional; core API remains available without them
-- Gemini streaming falls back to a non-stream completion then emits the full text
-- Search result caching depends on Redis when configured
-
-## License
-
-Private / unlicensed (`UNLICENSED` in `package.json`).
+| Command | Purpose |
+| --- | --- |
+| `npm run start:dev` | Development server |
+| `npm run start:prod` | Run the production build |
+| `npm run build` | Compile TypeScript |
+| `npm test` / `npm run test:e2e` | Unit / end-to-end tests |
+| `npm run prisma:migrate:deploy` | Apply migrations |
+| `npm run prisma:seed` | Seed roles, plans, providers, and admin |
